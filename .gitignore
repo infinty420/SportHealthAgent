@@ -1,0 +1,20 @@
+# DevEco Studio / hvigor 构建产物
+.hvigor/
+.cxx/
+.clangd/
+.clang-format
+.clang-tidy
+.appanalyzer/
+**/.test/
+
+# IDE
+.idea/
+
+# 依赖与构建输出
+node_modules/
+oh_modules/
+**/build/
+entry/.preview/
+
+# 本地环境
+local.properties

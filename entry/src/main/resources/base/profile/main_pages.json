@@ -1,0 +1,12 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/ExerciseLibrary",
+    "pages/ExerciseDetail",
+    "pages/FoodPicker",
+    "pages/Report",
+    "pages/ProfilePage",
+    "pages/WorkoutLogPage",
+    "pages/HistoryCalendar"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  // AI 生成 —— entry 模块依赖配置（无第三方依赖）
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "衡练 · 端侧运动健康 Agent 主模块",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}

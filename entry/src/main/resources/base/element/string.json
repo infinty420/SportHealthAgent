@@ -1,0 +1,88 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "端侧运动健康 Agent：纯规则引擎，不联网"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "衡练 · 运动健康 Agent 主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "衡练"
+    },
+    {
+      "name": "health_permission_reason",
+      "value": "用于从智能手表读取运动数据（时长/心率/配速/卡路里/训练负荷），仅在本地分析，不上传"
+    },
+    {
+      "name": "food_picker_title",
+      "value": "选择食物"
+    },
+    {
+      "name": "food_picker_search",
+      "value": "搜索食物名称"
+    },
+    {
+      "name": "food_picker_grams",
+      "value": "份量（克）"
+    },
+    {
+      "name": "food_picker_meal",
+      "value": "餐次"
+    },
+    {
+      "name": "food_picker_add",
+      "value": "加入今日饮食"
+    },
+    {
+      "name": "food_picker_added",
+      "value": "已记录到今日饮食"
+    },
+    {
+      "name": "report_title",
+      "value": "训练报表"
+    },
+    {
+      "name": "report_weekly",
+      "value": "近 7 天"
+    },
+    {
+      "name": "report_monthly",
+      "value": "近 30 天"
+    },
+    {
+      "name": "report_sessions",
+      "value": "训练次数"
+    },
+    {
+      "name": "report_duration",
+      "value": "总时长（分钟）"
+    },
+    {
+      "name": "report_calories",
+      "value": "总热量（千卡）"
+    },
+    {
+      "name": "report_avg_load",
+      "value": "平均负荷"
+    },
+    {
+      "name": "report_goal_rate",
+      "value": "目标达成率"
+    },
+    {
+      "name": "report_empty",
+      "value": "暂无数据，完成一次训练分析后生成报表"
+    },
+    {
+      "name": "profile_title",
+      "value": "用户画像"
+    },
+    {
+      "name": "profile_saved",
+      "value": "画像已保存，引擎将按你的情况个性化建议"
+    }
+  ]
+}

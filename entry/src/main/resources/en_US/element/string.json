@@ -1,0 +1,88 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "On-device sports & health agent: rule engine only, fully offline"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "HengLian sports & health agent entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "HengLian"
+    },
+    {
+      "name": "health_permission_reason",
+      "value": "Used to read workout data (duration/heart rate/pace/calories/load) from your smartwatch. Analyzed locally only, never uploaded."
+    },
+    {
+      "name": "food_picker_title",
+      "value": "Pick a Food"
+    },
+    {
+      "name": "food_picker_search",
+      "value": "Search food name"
+    },
+    {
+      "name": "food_picker_grams",
+      "value": "Amount (g)"
+    },
+    {
+      "name": "food_picker_meal",
+      "value": "Meal"
+    },
+    {
+      "name": "food_picker_add",
+      "value": "Add to today"
+    },
+    {
+      "name": "food_picker_added",
+      "value": "Logged to today's diet"
+    },
+    {
+      "name": "report_title",
+      "value": "Training Report"
+    },
+    {
+      "name": "report_weekly",
+      "value": "Last 7 days"
+    },
+    {
+      "name": "report_monthly",
+      "value": "Last 30 days"
+    },
+    {
+      "name": "report_sessions",
+      "value": "Sessions"
+    },
+    {
+      "name": "report_duration",
+      "value": "Total minutes"
+    },
+    {
+      "name": "report_calories",
+      "value": "Total kcal"
+    },
+    {
+      "name": "report_avg_load",
+      "value": "Avg load"
+    },
+    {
+      "name": "report_goal_rate",
+      "value": "Goal completion"
+    },
+    {
+      "name": "report_empty",
+      "value": "No data yet. Finish one workout analysis to generate the report."
+    },
+    {
+      "name": "profile_title",
+      "value": "Profile"
+    },
+    {
+      "name": "profile_saved",
+      "value": "Profile saved. The engine will personalize suggestions for you."
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  // AI 生成 —— 工程级依赖配置（无第三方依赖，保证端侧纯净）
+  "modelVersion": "5.0.0",
+  "description": "衡练 · 端侧运动健康 Agent（纯规则引擎，不联网）",
+  "dependencies": {}
+}
