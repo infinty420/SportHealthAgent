@@ -12,6 +12,8 @@
 import { common } from '@kit.AbilityKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { PerspectiveProjector, ProjectedPoint } from '../utils/PerspectiveProjector';
+import { BodyPathData } from '../data/BodyPathData';
 import { SectionCard } from '../components/SectionCard';
 import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
 import { WorkoutLog } from '../model/WorkoutLog';
@@ -99,6 +101,21 @@ export struct HistoryCalendar {
   @State private heatCanvasKey: string = 'heat-0';
   @State private donutCanvasKey: string = 'donut-0';
   @State private durCanvasKey: string = 'dur-0';
+
+  // ===== 2.5D 热力增强 =====
+  /** 热力指标：sessions 频次 / effectiveSets 组数 / volumeKg 容量 */
+  @State private heatMetric: string = 'sessions';
+  /** 部位图例点击选中（描边高亮；空串表示未选中） */
+  @State private heatHighlight: string = '';
+  /** 部位点击气泡（2 秒自动消失） */
+  @State private heatTip: string = '';
+  @State private heatTipVisible: boolean = false;
+  /** 部位点击命中区域（路径键 → 投影后像素多边形） */
+  private heatHitMap: Map<string, number[][]> = new Map<string, number[][]>();
+  // 自动摆动（±3°，40ms 一帧）
+  private swingAngle: number = 0;
+  private swingDir: number = 1;
+  private swingTimer: number = -1;
 
   aboutToAppear(): void {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
@@ -337,28 +354,143 @@ export struct HistoryCalendar {
 
   // ==================== Canvas 绘制 ====================
 
-  /** 频次 → 热力色（全部取自调色板） */
-  private freqColor(sessions: number): string {
-    if (sessions <= 0) {
+  /** 部位组 → 聚合结果（条件查找，避免动态索引） */
+  private statOf(group: string): MuscleStat | null {
+    let found: MuscleStat | null = null;
+    this.stats.forEach((item: MuscleStat) => {
+      if (item.muscle === group) {
+        found = item;
+      }
+    });
+    return found;
+  }
+
+  /** 部位组 → 当前热力指标值 */
+  private metricValueOf(group: string): number {
+    const stat: MuscleStat | null = this.statOf(group);
+    if (stat === null) {
+      return 0;
+    }
+    if (this.heatMetric === 'effectiveSets') {
+      return stat.effectiveSets;
+    }
+    if (this.heatMetric === 'volumeKg') {
+      return stat.volumeKg;
+    }
+    return stat.sessions;
+  }
+
+  /** 当前指标 → 0-3 档（频次 0/1-2/3-4/≥5；组数 0/1-5/6-15/>15；容量 0/<50/50-150/>150） */
+  private metricTierOf(group: string): number {
+    const value: number = this.metricValueOf(group);
+    if (value <= 0) {
+      return 0;
+    }
+    if (this.heatMetric === 'effectiveSets') {
+      if (value <= 5) {
+        return 1;
+      }
+      if (value <= 15) {
+        return 2;
+      }
+      return 3;
+    }
+    if (this.heatMetric === 'volumeKg') {
+      if (value < 50) {
+        return 1;
+      }
+      if (value <= 150) {
+        return 2;
+      }
+      return 3;
+    }
+    if (value <= 2) {
+      return 1;
+    }
+    if (value <= 4) {
+      return 2;
+    }
+    return 3;
+  }
+
+  /** 档位 → 热力色（全部取自调色板） */
+  private metricColor(group: string): string {
+    const tier: number = this.metricTierOf(group);
+    if (tier <= 0) {
       return this.theme.palette.track;
     }
-    if (sessions <= 2) {
+    if (tier === 1) {
       return this.theme.palette.success;
     }
-    if (sessions <= 4) {
+    if (tier === 2) {
       return this.theme.palette.accent;
     }
     return this.theme.palette.warning;
   }
 
-  private freqOf(group: string): number {
-    let value: number = 0;
-    this.stats.forEach((stat: MuscleStat) => {
-      if (stat.muscle === group) {
-        value = stat.sessions;
+  /** 部位最近一次训练日期（全部日志范围，tooltip 用） */
+  private lastDateOf(group: string): string {
+    let latest: string = '';
+    this.allLogs.forEach((log: WorkoutLog) => {
+      const item: ExerciseItem | null = ExerciseLibrary.findById(log.exerciseId);
+      if (item === null) {
+        return;
+      }
+      if (TrainingStatsAggregator.groupOf(item.muscle) !== group) {
+        return;
+      }
+      const key: string = log.dateKey();
+      if (key > latest) {
+        latest = key;
       }
     });
-    return value;
+    return latest.length === 0 ? '-' : latest;
+  }
+
+  /** 部位点击：命中检测 → 弹出统计气泡，2 秒后自动消失 */
+  private onHeatTap(x: number, y: number): void {
+    let hitGroup: string = '';
+    this.heatHitMap.forEach((points: number[][], key: string) => {
+      if (hitGroup.length === 0 && PerspectiveProjector.hitPolygon(x, y, points)) {
+        hitGroup = BodyPathData.groupOf(key);
+      }
+    });
+    if (hitGroup.length === 0) {
+      return;
+    }
+    const stat: MuscleStat | null = this.statOf(hitGroup);
+    if (stat === null || stat.sessions === 0) {
+      this.heatTip = `${hitGroup}：本周期暂无训练`;
+    } else {
+      this.heatTip = `${hitGroup}：${stat.sessions} 次 · ${stat.effectiveSets} 组 · ` +
+        `${stat.volumeKg} kg · 最近 ${this.lastDateOf(hitGroup)}`;
+    }
+    this.heatTipVisible = true;
+    setTimeout(() => {
+      this.heatTipVisible = false;
+    }, 2000);
+  }
+
+  /** 启动 2.5D 热力图自动摆动（±3° 往返，40ms 一帧） */
+  private startSwing(): void {
+    if (this.swingTimer >= 0) {
+      return;
+    }
+    this.swingTimer = setInterval(() => {
+      this.swingAngle += 0.15 * this.swingDir;
+      if (Math.abs(this.swingAngle) >= 3) {
+        this.swingDir = -this.swingDir;
+      }
+      this.drawHeat();
+    }, 40);
+  }
+
+  /** 组件销毁：停止摆动动画定时器 */
+  aboutToDisappear(): void {
+    if (this.swingTimer >= 0) {
+      clearInterval(this.swingTimer);
+      this.swingTimer = -1;
+    }
   }
 
   /** 环形图分段色（调色板轮换） */
@@ -385,44 +517,124 @@ export struct HistoryCalendar {
     return this.theme.palette.secondaryText;
   }
 
-  private heatBlock(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string): void {
-    ctx.fillStyle = color;
-    ctx.fillRect(x, y, w, h);
-  }
-
-  /** 绘制人体热力（正面 + 背面），颜色反映范围内各部位训练频次 */
+  /** 绘制 2.5D 立体人体热力（正面 + 背面），颜色按当前指标档位，整体随 swingAngle 摆动 */
   private drawHeat(): void {
     const ctx: CanvasRenderingContext2D = this.heatCtx;
     ctx.clearRect(0, 0, 320, 190);
-    ctx.lineWidth = 1;
-    const chest: string = this.freqColor(this.freqOf('胸'));
-    const back: string = this.freqColor(this.freqOf('背'));
-    const shoulder: string = this.freqColor(this.freqOf('肩'));
-    const leg: string = this.freqColor(this.freqOf('腿'));
-    const glute: string = this.freqColor(this.freqOf('臀'));
-    const abs: string = this.freqColor(this.freqOf('腹'));
-    const arm: string = this.freqColor(this.freqOf('手臂'));
-    // 正面（左半）
-    this.heatBlock(ctx, 30, 26, 100, 14, shoulder);
-    this.heatBlock(ctx, 45, 42, 70, 30, chest);
-    this.heatBlock(ctx, 24, 42, 18, 52, arm);
-    this.heatBlock(ctx, 118, 42, 18, 52, arm);
-    this.heatBlock(ctx, 48, 74, 64, 26, abs);
-    this.heatBlock(ctx, 48, 102, 64, 18, glute);
-    this.heatBlock(ctx, 50, 122, 28, 58, leg);
-    this.heatBlock(ctx, 82, 122, 28, 58, leg);
-    // 背面（右半）
-    this.heatBlock(ctx, 190, 26, 100, 14, shoulder);
-    this.heatBlock(ctx, 205, 42, 70, 52, back);
-    this.heatBlock(ctx, 208, 96, 64, 18, glute);
-    this.heatBlock(ctx, 210, 116, 28, 58, leg);
-    this.heatBlock(ctx, 242, 116, 28, 58, leg);
     // 图注
     ctx.fillStyle = this.theme.palette.secondaryText;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('正面', 80, 12);
     ctx.fillText('背面', 240, 12);
+    // 命中区域每次重绘重建（投影随摆动变化）
+    this.heatHitMap.clear();
+    // 正面组整体倾斜 +swingAngle，背面组 -swingAngle（自动摆动 ±3°）
+    this.drawBody25D(ctx, BodyPathData.getFrontPaths(), 30, 22, this.swingAngle);
+    this.drawBody25D(ctx, BodyPathData.getBackPaths(), 190, 22, -this.swingAngle);
+  }
+
+  /** 单个人体：透视投影 + 45° 明暗渐变 + 底部投影 + 高频高光 + 选中描边 + 训练日红点标记 */
+  private drawBody25D(ctx: CanvasRenderingContext2D, paths: Map<string, number[][]>,
+    originX: number, originY: number, tiltDeg: number): void {
+    const bodyW: number = 100;
+    const bodyH: number = 158;
+    const vanishingX: number = originX + bodyW / 2;
+    const vanishingY: number = originY - 16;
+    const rad: number = tiltDeg * Math.PI / 180;
+    ctx.save();
+    ctx.transform(1, Math.sin(rad), Math.sin(rad), 1, 0, 0);
+    paths.forEach((points: number[][], key: string) => {
+      const group: string = BodyPathData.groupOf(key);
+      const tier: number = this.metricTierOf(group);
+      const base: string = this.metricColor(group);
+      const z: number = BodyPathData.depthOf(key);
+      // 归一化坐标 → 画布坐标 → 透视投影，同时记录包围盒
+      const projected: number[][] = [];
+      let minX: number = 1000;
+      let minY: number = 1000;
+      let maxX: number = -1000;
+      let maxY: number = -1000;
+      points.forEach((pt: number[]) => {
+        const sx: number = originX + pt[0] / 100 * bodyW;
+        const sy: number = originY + pt[1] / 100 * bodyH;
+        const pp: ProjectedPoint = PerspectiveProjector.project(sx, sy, z, vanishingX, vanishingY);
+        projected.push([pp.px, pp.py]);
+        minX = Math.min(minX, pp.px);
+        minY = Math.min(minY, pp.py);
+        maxX = Math.max(maxX, pp.px);
+        maxY = Math.max(maxY, pp.py);
+      });
+      // 部位点击命中区域（像素坐标）
+      this.heatHitMap.set(key, projected);
+      // 部位路径
+      ctx.beginPath();
+      projected.forEach((pt: number[], idx: number) => {
+        if (idx === 0) {
+          ctx.moveTo(pt[0], pt[1]);
+        } else {
+          ctx.lineTo(pt[0], pt[1]);
+        }
+      });
+      ctx.closePath();
+      // 左上 45° 明暗渐变（浅色在上、深色在下，明暗由调色板基色推导）
+      const gradient: CanvasGradient = ctx.createLinearGradient(minX, minY, maxX, maxY);
+      gradient.addColorStop(0, PerspectiveProjector.shadeColor(base, 0.35));
+      gradient.addColorStop(1, PerspectiveProjector.shadeColor(base, -0.25));
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      // 底部投影（深色半透明椭圆，向下偏移 2px）
+      ctx.save();
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = this.theme.palette.primaryText;
+      ctx.beginPath();
+      ctx.ellipse((minX + maxX) / 2, maxY + 2, Math.max(2, (maxX - minX) / 2), 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      // 高频部位（第 3 档）叠加 45° 斜向高光条（裁剪在部位路径内）
+      if (tier >= 2) {
+        ctx.save();
+        ctx.clip();
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = this.theme.palette.onHero;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(minX - 4, maxY + 4);
+        ctx.lineTo(maxX + 4, minY - 4);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // 部位图例点击选中：描边高亮
+      if (this.heatHighlight === group) {
+        ctx.beginPath();
+        projected.forEach((pt: number[], idx: number) => {
+          if (idx === 0) {
+            ctx.moveTo(pt[0], pt[1]);
+          } else {
+            ctx.lineTo(pt[0], pt[1]);
+          }
+        });
+        ctx.closePath();
+        ctx.strokeStyle = this.theme.palette.accent;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      // 训练日标记：有训练的部位中心画红点 + 频次数（成对部位只在左侧画一次）
+      const stat: MuscleStat | null = this.statOf(group);
+      if (stat !== null && stat.sessions > 0 && !key.endsWith('右')) {
+        const cx: number = (minX + maxX) / 2;
+        const cy: number = (minY + maxY) / 2;
+        ctx.beginPath();
+        ctx.fillStyle = this.theme.palette.danger;
+        ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = this.theme.palette.onHero;
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${stat.sessions}`, cx, cy + 3);
+      }
+    });
+    ctx.restore();
   }
 
   /** 绘制部位组数环形图（中心显示总组数） */
@@ -693,28 +905,84 @@ export struct HistoryCalendar {
                 .fontColor(this.theme.palette.secondaryText)
                 .lineHeight(18)
             } else {
-              // ---- 部位频次人体热力 ----
-              Text('部位频次')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(this.theme.palette.primaryText)
-                .margin({ top: 4, bottom: 6 })
-              Canvas(this.heatCtx)
-                .width('100%')
-                .height(190)
-                .key(this.heatCanvasKey)
-                .accessibilityText('部位频次人体热力图')
-                .onReady(() => {
-                  this.drawHeat();
-                })
-              Row({ space: 14 }) {
-                this.legendChip(this.theme.palette.track, '0 次')
-                this.legendChip(this.theme.palette.success, '1–2 次')
-                this.legendChip(this.theme.palette.accent, '3–4 次')
-                this.legendChip(this.theme.palette.warning, '≥5 次')
+              // ---- 部位热力（2.5D 立体；频次/组数/容量三指标切换；点击部位看详情） ----
+              Row() {
+                Text('部位热力')
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.theme.palette.primaryText)
+                Blank()
+                Row({ space: 6 }) {
+                  this.metricChip('sessions', '频次')
+                  this.metricChip('effectiveSets', '组数')
+                  this.metricChip('volumeKg', '容量')
+                }
               }
               .width('100%')
-              .margin({ top: 4, bottom: 10 })
+              .margin({ top: 4, bottom: 6 })
+              Stack() {
+                Canvas(this.heatCtx)
+                  .width('100%')
+                  .height(190)
+                  .key(this.heatCanvasKey)
+                  .accessibilityText('部位热力图，点击部位查看统计')
+                  .onReady(() => {
+                    this.drawHeat();
+                    this.startSwing();
+                  })
+                  .onClick((event: ClickEvent) => {
+                    this.onHeatTap(event.x, event.y);
+                  })
+                // 部位点击气泡（2 秒自动消失）
+                if (this.heatTipVisible) {
+                  Text(this.heatTip)
+                    .fontSize(12)
+                    .fontColor(this.theme.palette.onAccent)
+                    .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+                    .backgroundColor(this.theme.palette.accent)
+                    .borderRadius(10)
+                    .margin({ top: 6, left: 6 })
+                }
+              }
+              .width('100%')
+              .align(Alignment.TopStart)
+              // 图例：色阶标签随指标切换
+              Row({ space: 14 }) {
+                this.legendChip(this.theme.palette.track, '0')
+                this.legendChip(this.theme.palette.success,
+                  this.heatMetric === 'sessions' ? '1–2 次' : (this.heatMetric === 'effectiveSets' ? '1–5 组' : '<50 kg'))
+                this.legendChip(this.theme.palette.accent,
+                  this.heatMetric === 'sessions' ? '3–4 次' : (this.heatMetric === 'effectiveSets' ? '6–15 组' : '50–150 kg'))
+                this.legendChip(this.theme.palette.warning,
+                  this.heatMetric === 'sessions' ? '≥5 次' : (this.heatMetric === 'effectiveSets' ? '>15 组' : '>150 kg'))
+              }
+              .width('100%')
+              .margin({ top: 4 })
+              // 部位图例（点击描边高亮对应部位，再点取消）
+              Flex({ wrap: FlexWrap.Wrap }) {
+                ForEach(HEAT_MUSCLE_GROUPS, (group: string) => {
+                  Row({ space: 4 }) {
+                    Circle({ width: 8, height: 8 })
+                      .fill(this.metricColor(group))
+                    Text(group)
+                      .fontSize(12)
+                      .fontColor(this.heatHighlight === group ?
+                        this.theme.palette.accent : this.theme.palette.secondaryText)
+                  }
+                  .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                  .borderRadius(12)
+                  .backgroundColor(this.heatHighlight === group ?
+                    this.theme.palette.accentSoft : this.theme.palette.cardBackground)
+                  .margin({ right: 6, top: 6 })
+                  .accessibilityText(`高亮部位 ${group}`)
+                  .onClick(() => {
+                    this.heatHighlight = this.heatHighlight === group ? '' : group;
+                    this.drawHeat();
+                  })
+                }, (group: string) => group)
+              }
+              .width('100%')
+              .margin({ bottom: 10 })
 
               // ---- 部位组数分布环形图 ----
               Text('部位组数分布')
@@ -849,5 +1117,23 @@ export struct HistoryCalendar {
         .fontSize(11)
         .fontColor(this.theme.palette.secondaryText)
     }
+  }
+
+  /** 热力指标切换胶囊（频次/组数/容量；选中态直接读取 @State heatMetric 保持响应式） */
+  @Builder
+  metricChip(metric: string, label: string) {
+    Text(label)
+      .fontSize(12)
+      .fontColor(this.heatMetric === metric ?
+        this.theme.palette.onAccent : this.theme.palette.primaryText)
+      .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+      .borderRadius(12)
+      .backgroundColor(this.heatMetric === metric ?
+        this.theme.palette.accent : this.theme.palette.inputBackground)
+      .accessibilityText(`热力指标切换为${label}`)
+      .onClick(() => {
+        this.heatMetric = metric;
+        this.drawHeat();
+      })
   }
 }
