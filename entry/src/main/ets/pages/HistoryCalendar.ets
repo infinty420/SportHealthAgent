@@ -9,7 +9,6 @@
  * 数据全部来自本地 WorkoutLogStore / HistoryStore，确定性规则聚合，无网络请求。
  * 主题约束：本文件不出现任何硬编码色值，一律读取 theme.palette.*。
  */
-import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -48,10 +47,11 @@ interface DonutLegendItem {
   colorIndex: number;
 }
 
-@Entry
 @Component
-struct HistoryCalendar {
+export struct HistoryCalendar {
   @State theme: ThemeManager = ThemeManager.instance;
+  /** 父级 Tabs 切换信号：值变化时重载日历与统计数据（替代页面级 onPageShow） */
+  @Prop @Watch('reloadAll') refreshTick: number = 0;
   private logStore: WorkoutLogStore | null = null;
   private historyStore: HistoryStore | null = null;
 
@@ -500,23 +500,12 @@ struct HistoryCalendar {
 
   build() {
     Column() {
-      // ===== 顶部栏 =====
+      // ===== 顶部栏（已嵌入底部 Tabs，无返回键） =====
       Row() {
-        Button('‹ 返回')
-          .fontSize(14)
-          .fontColor(this.theme.palette.accent)
-          .backgroundColor(this.theme.palette.inputBackground)
-          .borderRadius(18)
-          .height(36)
-          .accessibilityText('返回上一页')
-          .onClick(() => {
-            router.back();
-          })
         Text('发现')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.theme.palette.primaryText)
-          .margin({ left: 12 })
         Blank()
         ThemeToggle({ theme: this.theme })
       }

@@ -35,7 +35,8 @@ import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/Muscl
 import { StrengthCalculator } from '../agent/rules/StrengthCalculator';
 import { AnalysisReport, WeeklyPlanDay } from '../agent/AnalysisResult';
 import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
-import { ExerciseDetailParams } from './ExerciseLibrary';
+import { ExerciseDetailParams, ExerciseLibraryPage } from './ExerciseLibrary';
+import { HistoryCalendar } from './HistoryCalendar';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { SectionCard } from '../components/SectionCard';
 import { LoadBadge } from '../components/LoadBadge';
@@ -113,6 +114,11 @@ struct Index {
   @State paceText: string = '6\'00"/km';
   @State caloriesText: string = '400';
   @State loadText: string = '';
+
+  // 底部 Tabs 导航（0 首页 / 1 训练 / 2 计划 / 3 动作库 / 4 发现）
+  @State currentTab: number = 0;
+  /** 发现页刷新信号：切到发现 Tab 时自增，触发日历数据重载 */
+  @State discoverTick: number = 0;
 
   // 分析结果与校验错误（reportV2 为双引擎对比输出）
   @State report: AnalysisReport | null = null;
@@ -595,8 +601,86 @@ struct Index {
   }
 
   build() {
+    // ===== 底部五栏 Tabs 导航（参考快练：首页/训练/计划/动作库/发现） =====
+    Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
+      TabContent() {
+        this.homeTab()
+      }
+      .tabBar(this.tabBarItem(0, '🏠', '首页'))
+      TabContent() {
+        this.trainTab()
+      }
+      .tabBar(this.tabBarItem(1, '⚡', '训练'))
+      TabContent() {
+        this.planTab()
+      }
+      .tabBar(this.tabBarItem(2, '🗓', '计划'))
+      TabContent() {
+        ExerciseLibraryPage()
+      }
+      .tabBar(this.tabBarItem(3, '🏋', '动作库'))
+      TabContent() {
+        HistoryCalendar({ refreshTick: this.discoverTick })
+      }
+      .tabBar(this.tabBarItem(4, '🧭', '发现'))
+    }
+    .width('100%')
+    .height('100%')
+    .barMode(BarMode.Fixed)
+    .barHeight(64)
+    .barBackgroundColor(this.theme.palette.cardBackground)
+    .animationDuration(200)
+    .backgroundColor(this.theme.palette.pageBackground)
+    .onChange((index: number) => {
+      this.currentTab = index;
+      // 切回首页时重载画像/伤病/营养/肌群热力（替代原 onPageShow 的跨页刷新）
+      if (index === 0) {
+        this.reloadProfile();
+        this.applyInjuries();
+        this.refreshIntake();
+        this.refreshMuscleHeat();
+      }
+      // 切到发现页时通知日历重载训练日志
+      if (index === 4) {
+        this.discoverTick++;
+      }
+    })
+  }
+
+  /** 底部导航项（参考快练：选中项浅灰胶囊底 + 加粗标签，未选中灰色） */
+  @Builder
+  private tabBarItem(index: number, icon: string, label: string): void {
+    Column({ space: 3 }) {
+      Stack() {
+        if (this.currentTab === index) {
+          Row()
+            .width(56)
+            .height(30)
+            .borderRadius(15)
+            .backgroundColor(this.theme.palette.inputBackground)
+        }
+        Text(icon)
+          .fontSize(18)
+      }
+      .width(56)
+      .height(30)
+      Text(label)
+        .fontSize(11)
+        .fontWeight(this.currentTab === index ? FontWeight.Bold : FontWeight.Regular)
+        .fontColor(this.currentTab === index ?
+          this.theme.palette.primaryText : this.theme.palette.secondaryText)
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .accessibilityText(`${label}标签`)
+  }
+
+  /** 首页 Tab：画像 / 每日状态 / 本周目标 / 今日营养 / 肌群热力 / 历史趋势 */
+  @Builder
+  private homeTab(): void {
     Column() {
-      // ===== 顶部栏：标题 + 深色/浅色切换 =====
+      // ===== 顶部栏：标题 + 报表入口 + 深色/浅色切换 =====
       Row() {
         Column({ space: 2 }) {
           Text('衡练 · 运动健康 Agent')
@@ -609,20 +693,6 @@ struct Index {
         }
         .alignItems(HorizontalAlign.Start)
         Blank()
-        Button('📝 记训练')
-          .fontSize(14)
-          .fontColor(this.theme.palette.accent)
-          .backgroundColor(this.theme.palette.inputBackground)
-          .borderRadius(18)
-          .height(36)
-          .margin({ right: 8 })
-          .accessibilityText('打开训练日志录入页')
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/WorkoutLogPage' })
-              .catch((err: Error) => {
-                console.error(`openWorkoutLog failed: ${err.message}`);
-              });
-          })
         Button('📊 报表')
           .fontSize(14)
           .fontColor(this.theme.palette.accent)
@@ -635,33 +705,6 @@ struct Index {
             router.pushUrl({ url: 'pages/Report' })
               .catch((err: Error) => {
                 console.error(`openReport failed: ${err.message}`);
-              });
-          })
-        Button('📅 发现')
-          .fontSize(14)
-          .fontColor(this.theme.palette.accent)
-          .backgroundColor(this.theme.palette.inputBackground)
-          .borderRadius(18)
-          .height(36)
-          .margin({ right: 8 })
-          .accessibilityText('打开发现页：训练历史日历与数据统计')
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/HistoryCalendar' })
-              .catch((err: Error) => {
-                console.error(`openHistoryCalendar failed: ${err.message}`);
-              });
-          })
-        Button('🏋 动作库')
-          .fontSize(14)
-          .fontColor(this.theme.palette.accent)
-          .backgroundColor(this.theme.palette.inputBackground)
-          .borderRadius(18)
-          .height(36)
-          .margin({ right: 8 })
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/ExerciseLibrary' })
-              .catch((err: Error) => {
-                console.error(`openExerciseLibrary failed: ${err.message}`);
               });
           })
         ThemeToggle({ theme: this.theme })
@@ -816,89 +859,7 @@ struct Index {
             }
           }
 
-          // ===== 数据录入卡片 =====
-          SectionCard({ theme: this.theme, title: '运动数据录入' }) {
-            // 运动类型下拉
-            Text('运动类型')
-              .fontSize(13)
-              .fontColor(this.theme.palette.secondaryText)
-              .margin({ bottom: 4 })
-            Select(this.buildSportOptions())
-              .value(this.sportType)
-              .fontColor(this.theme.palette.primaryText)
-              .backgroundColor(this.theme.palette.inputBackground)
-              .onSelect((index: number) => {
-                this.sportType = SPORT_TYPE_LIST[index];
-              })
-              .margin({ bottom: 10 })
-
-            this.numberField('运动时长（分钟）', this.durationText, (v: string) => {
-              this.durationText = v;
-            })
-            this.numberField('平均心率（次/分）', this.hrText, (v: string) => {
-              this.hrText = v;
-            })
-            this.textField('配速（如 6\'00"/km，无则填 -）', this.paceText, (v: string) => {
-              this.paceText = v;
-            })
-            this.numberField('消耗热量（千卡）', this.caloriesText, (v: string) => {
-              this.caloriesText = v;
-            })
-            this.numberField('训练负荷（0–100，留空自动估算）', this.loadText, (v: string) => {
-              this.loadText = v;
-            })
-
-            // 校验错误提示
-            if (this.errors.length > 0) {
-              Column({ space: 4 }) {
-                ForEach(this.errors, (err: string) => {
-                  Text(`· ${err}`)
-                    .fontSize(13)
-                    .fontColor(this.theme.palette.danger)
-                }, (err: string) => err)
-              }
-              .alignItems(HorizontalAlign.Start)
-              .width('100%')
-              .margin({ bottom: 10 })
-            }
-
-            Row({ space: 10 }) {
-              Button('开始分析')
-                .fontColor(this.theme.palette.onAccent)
-                .backgroundColor(this.theme.palette.accent)
-                .borderRadius(20)
-                .layoutWeight(1)
-                .onClick(() => {
-                  this.runManualAnalysis();
-                })
-              Button('模拟数据')
-                .fontColor(this.theme.palette.accent)
-                .backgroundColor(this.theme.palette.inputBackground)
-                .borderRadius(20)
-                .layoutWeight(1)
-                .accessibilityText('生成一条模拟运动记录并分析')
-                .onClick(() => {
-                  this.runMockAnalysis();
-                })
-            }
-            .width('100%')
-            Button('读取手表')
-              .fontColor(this.theme.palette.accent)
-              .backgroundColor(this.theme.palette.inputBackground)
-              .borderRadius(20)
-              .width('100%')
-              .margin({ top: 10 })
-              .onClick(() => {
-                this.runHealthKitRead();
-              })
-          }
-
-          // ===== 分析结果（按引用传参 $$，@State 变化时卡片同步刷新） =====
-          if (this.report !== null) {
-            this.resultCards({ report: this.report })
-          }
-
-          // ===== 历史与趋势 =====
+          // ===== 历史与负荷趋势（首页卡） =====
           SectionCard({ theme: this.theme, title: '历史与负荷趋势' }) {
             if (this.history.length === 0) {
               Text('暂无历史记录，完成一次分析后这里会展示负荷趋势')
@@ -1019,6 +980,179 @@ struct Index {
               }
               .width('100%')
               .margin({ top: 6 })
+            }
+          }
+        }
+        .padding({ left: 16, right: 16 })
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.theme.palette.pageBackground)
+  }
+
+  /** 训练 Tab：运动数据录入 + 分析结果 + 力量训练日志入口 */
+  @Builder
+  private trainTab(): void {
+    Column() {
+      // ===== 顶部栏：标题 + 记训练入口 =====
+      Row() {
+        Column({ space: 2 }) {
+          Text('训练')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.theme.palette.primaryText)
+          Text('录入运动数据，端侧 Agent 即时分析')
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+        }
+        .alignItems(HorizontalAlign.Start)
+        Blank()
+        Button('📝 记训练')
+          .fontSize(14)
+          .fontColor(this.theme.palette.accent)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .borderRadius(18)
+          .height(36)
+          .accessibilityText('打开训练日志录入页')
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/WorkoutLogPage' })
+              .catch((err: Error) => {
+                console.error(`openWorkoutLog failed: ${err.message}`);
+              });
+          })
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+
+      Scroll() {
+        Column() {
+          // ===== 数据录入卡片 =====
+          SectionCard({ theme: this.theme, title: '运动数据录入' }) {
+            // 运动类型下拉
+            Text('运动类型')
+              .fontSize(13)
+              .fontColor(this.theme.palette.secondaryText)
+              .margin({ bottom: 4 })
+            Select(this.buildSportOptions())
+              .value(this.sportType)
+              .fontColor(this.theme.palette.primaryText)
+              .backgroundColor(this.theme.palette.inputBackground)
+              .onSelect((index: number) => {
+                this.sportType = SPORT_TYPE_LIST[index];
+              })
+              .margin({ bottom: 10 })
+
+            this.numberField('运动时长（分钟）', this.durationText, (v: string) => {
+              this.durationText = v;
+            })
+            this.numberField('平均心率（次/分）', this.hrText, (v: string) => {
+              this.hrText = v;
+            })
+            this.textField('配速（如 6\'00"/km，无则填 -）', this.paceText, (v: string) => {
+              this.paceText = v;
+            })
+            this.numberField('消耗热量（千卡）', this.caloriesText, (v: string) => {
+              this.caloriesText = v;
+            })
+            this.numberField('训练负荷（0–100，留空自动估算）', this.loadText, (v: string) => {
+              this.loadText = v;
+            })
+
+            // 校验错误提示
+            if (this.errors.length > 0) {
+              Column({ space: 4 }) {
+                ForEach(this.errors, (err: string) => {
+                  Text(`· ${err}`)
+                    .fontSize(13)
+                    .fontColor(this.theme.palette.danger)
+                }, (err: string) => err)
+              }
+              .alignItems(HorizontalAlign.Start)
+              .width('100%')
+              .margin({ bottom: 10 })
+            }
+
+            Row({ space: 10 }) {
+              Button('开始分析')
+                .fontColor(this.theme.palette.onAccent)
+                .backgroundColor(this.theme.palette.accent)
+                .borderRadius(20)
+                .layoutWeight(1)
+                .onClick(() => {
+                  this.runManualAnalysis();
+                })
+              Button('模拟数据')
+                .fontColor(this.theme.palette.accent)
+                .backgroundColor(this.theme.palette.inputBackground)
+                .borderRadius(20)
+                .layoutWeight(1)
+                .accessibilityText('生成一条模拟运动记录并分析')
+                .onClick(() => {
+                  this.runMockAnalysis();
+                })
+            }
+            .width('100%')
+            Button('读取手表')
+              .fontColor(this.theme.palette.accent)
+              .backgroundColor(this.theme.palette.inputBackground)
+              .borderRadius(20)
+              .width('100%')
+              .margin({ top: 10 })
+              .onClick(() => {
+                this.runHealthKitRead();
+              })
+          }
+
+          // ===== 分析结果（按引用传参 $$，@State 变化时卡片同步刷新） =====
+          if (this.report !== null) {
+            this.resultCards({ report: this.report })
+          }
+
+        }
+        .padding({ left: 16, right: 16 })
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Off)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.theme.palette.pageBackground)
+  }
+
+  /** 计划 Tab：本周训练计划 + 引擎 V2 对比 + 规则设置 */
+  @Builder
+  private planTab(): void {
+    Column() {
+      // ===== 顶部栏：标题 =====
+      Row() {
+        Column({ space: 2 }) {
+          Text('计划')
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.theme.palette.primaryText)
+          Text('周训练计划与端侧规则参数')
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+        }
+        .alignItems(HorizontalAlign.Start)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+
+      Scroll() {
+        Column() {
+          // ===== 本周训练计划 + 引擎 V2 对比（完成一次分析后生成） =====
+          if (this.report !== null) {
+            this.planCards({ report: this.report })
+          } else {
+            SectionCard({ theme: this.theme, title: '本周训练计划' }) {
+              Text('在「训练」页完成一次运动数据分析后，这里会生成本周训练计划（含休息日与强度轮换）')
+                .fontSize(13)
+                .fontColor(this.theme.palette.secondaryText)
+                .lineHeight(18)
             }
           }
 
@@ -1268,6 +1402,15 @@ struct Index {
         .margin({ top: 8 })
     }
 
+    Text(`报告生成于 ${$$.report.generatedAt} · 全部计算在本地完成`)
+      .fontSize(12)
+      .fontColor(this.theme.palette.secondaryText)
+      .margin({ bottom: 24 })
+  }
+
+  /** 计划 Tab 卡片组：本周训练计划 + 引擎 V2 对比（$$ 按引用传参，@State report 更新时刷新） */
+  @Builder
+  private planCards($$: ReportRef): void {
     // 扩展模块 本周训练计划（7 天周期，含休息日与强度轮换）
     SectionCard({ theme: this.theme, title: '本周训练计划' }) {
       ForEach($$.report.weeklyPlan.days, (day: WeeklyPlanDay) => {
@@ -1339,11 +1482,6 @@ struct Index {
           .fontColor(this.theme.palette.secondaryText)
       }
     }
-
-    Text(`报告生成于 ${$$.report.generatedAt} · 全部计算在本地完成`)
-      .fontSize(12)
-      .fontColor(this.theme.palette.secondaryText)
-      .margin({ bottom: 24 })
   }
 
   /** 一组食物卡片（Keep 风格：横向滑动，图片 + 名称 + 每 100g 热量） */

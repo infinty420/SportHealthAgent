@@ -15,9 +15,8 @@ export class ExerciseDetailParams {
   id: string = '';
 }
 
-@Entry
 @Component
-struct ExerciseLibraryPage {
+export struct ExerciseLibraryPage {
   @State theme: ThemeManager = ThemeManager.instance;
   @State selectedEquipment: string = '全部';
   @State selectedMuscle: string = '全部';
@@ -53,22 +52,12 @@ struct ExerciseLibraryPage {
 
   build() {
     Column() {
-      // ===== 顶部栏：返回 + 标题 + 主题切换 =====
+      // ===== 顶部栏：标题 + 主题切换（已嵌入底部 Tabs，无返回键） =====
       Row() {
-        Button('‹ 返回')
-          .fontSize(14)
-          .fontColor(this.theme.palette.accent)
-          .backgroundColor(this.theme.palette.inputBackground)
-          .borderRadius(18)
-          .height(36)
-          .onClick(() => {
-            router.back();
-          })
         Text('动作库')
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.theme.palette.primaryText)
-          .margin({ left: 12 })
         Blank()
         ThemeToggle({ theme: this.theme })
       }
