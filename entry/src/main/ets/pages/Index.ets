@@ -397,13 +397,19 @@ struct Index {
     return 0;
   }
 
+  /** Canvas 字体（vp 规格 → 物理 px，解决高分屏文字过小问题） */
+  private canvasFont(vpSize: number, bold: boolean): string {
+    const px: number = Math.round(vp2px(vpSize));
+    return bold ? `bold ${px}px sans-serif` : `${px}px sans-serif`;
+  }
+
   /** 绘制 2.5D 立体人体热力（正面 + 背面），颜色反映本周各部位有效组数，整体随 swingAngle 摆动 */
   private drawMuscleHeat(): void {
     const ctx: CanvasRenderingContext2D = this.heatCtx;
     ctx.clearRect(0, 0, 320, 190);
     // 图注
     ctx.fillStyle = this.theme.palette.secondaryText;
-    ctx.font = '11px sans-serif';
+    ctx.font = this.canvasFont(12, false);
     ctx.textAlign = 'center';
     ctx.fillText('正面', 80, 12);
     ctx.fillText('背面', 240, 12);

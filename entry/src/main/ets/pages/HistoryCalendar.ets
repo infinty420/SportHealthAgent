@@ -517,13 +517,19 @@ export struct HistoryCalendar {
     return this.theme.palette.secondaryText;
   }
 
+  /** Canvas 字体（vp 规格 → 物理 px，解决高分屏文字过小问题） */
+  private canvasFont(vpSize: number, bold: boolean): string {
+    const px: number = Math.round(vp2px(vpSize));
+    return bold ? `bold ${px}px sans-serif` : `${px}px sans-serif`;
+  }
+
   /** 绘制 2.5D 立体人体热力（正面 + 背面），颜色按当前指标档位，整体随 swingAngle 摆动 */
   private drawHeat(): void {
     const ctx: CanvasRenderingContext2D = this.heatCtx;
     ctx.clearRect(0, 0, 320, 190);
     // 图注
     ctx.fillStyle = this.theme.palette.secondaryText;
-    ctx.font = '11px sans-serif';
+    ctx.font = this.canvasFont(12, false);
     ctx.textAlign = 'center';
     ctx.fillText('正面', 80, 12);
     ctx.fillText('背面', 240, 12);
@@ -629,7 +635,7 @@ export struct HistoryCalendar {
         ctx.arc(cx, cy, 7, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = this.theme.palette.onHero;
-        ctx.font = '9px sans-serif';
+        ctx.font = this.canvasFont(10, true);
         ctx.textAlign = 'center';
         ctx.fillText(`${stat.sessions}`, cx, cy + 3);
       }
@@ -670,12 +676,12 @@ export struct HistoryCalendar {
     }
     // 中心总组数
     ctx.fillStyle = this.theme.palette.primaryText;
-    ctx.font = 'bold 26px sans-serif';
+    ctx.font = this.canvasFont(32, true);
     ctx.textAlign = 'center';
     ctx.fillText(`${this.totalSets}`, cx, cy + 2);
     ctx.fillStyle = this.theme.palette.secondaryText;
-    ctx.font = '12px sans-serif';
-    ctx.fillText('总组数', cx, cy + 24);
+    ctx.font = this.canvasFont(13, false);
+    ctx.fillText('总组数', cx, cy + 26);
   }
 
   /** 绘制训练时长对比双柱（左：上一周期，右：本周期） */
@@ -695,7 +701,7 @@ export struct HistoryCalendar {
     ctx.fillRect(190, baseY - curH, 70, curH);
     // 数值
     ctx.fillStyle = this.theme.palette.secondaryText;
-    ctx.font = '12px sans-serif';
+    ctx.font = this.canvasFont(13, false);
     ctx.textAlign = 'center';
     ctx.fillText(`${this.durPrev} 分钟`, 95, baseY - prevH - 8);
     ctx.fillStyle = this.theme.palette.accent;
