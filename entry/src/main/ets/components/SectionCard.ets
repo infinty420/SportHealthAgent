@@ -27,6 +27,7 @@ export struct SectionCard {
     .padding(16)
     .borderRadius(16)
     .backgroundColor(this.theme.palette.cardBackground)
+    .shadow({ radius: 14, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 4 })
     .margin({ bottom: 14 })
   }
 }

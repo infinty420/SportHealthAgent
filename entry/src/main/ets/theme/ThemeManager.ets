@@ -38,6 +38,16 @@ export interface Palette {
   carb: string;
   /** 宏量营养素：脂肪 */
   fat: string;
+  /** 强调色浅底（选中胶囊、标签底色） */
+  accentSoft: string;
+  /** 首页横幅渐变起始色 */
+  heroStart: string;
+  /** 首页横幅渐变结束色 */
+  heroEnd: string;
+  /** 横幅上的文字颜色（两种主题下均为浅色） */
+  onHero: string;
+  /** 卡片柔和投影色 */
+  cardShadow: string;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -72,7 +82,12 @@ export class ThemeManager {
     track: '#E3E7EC',
     protein: '#E5484D',
     carb: '#2F6BFF',
-    fat: '#E8A13A'
+    fat: '#E8A13A',
+    accentSoft: '#E4ECFF',
+    heroStart: '#3D74FF',
+    heroEnd: '#7BA6FF',
+    onHero: '#FFFFFF',
+    cardShadow: '#14000000'
   };
 
   /** 深色调色板（全应用深色颜色唯一定义处） */
@@ -90,7 +105,12 @@ export class ThemeManager {
     track: '#33383E',
     protein: '#FF6B70',
     carb: '#6E9BFF',
-    fat: '#F2B75C'
+    fat: '#F2B75C',
+    accentSoft: '#24344F',
+    heroStart: '#1F3A6E',
+    heroEnd: '#2E4E8F',
+    onHero: '#FFFFFF',
+    cardShadow: '#66000000'
   };
 
   /** 当前生效的调色板：组件一律通过 theme.palette.* 取色 */

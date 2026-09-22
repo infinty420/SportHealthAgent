@@ -629,6 +629,7 @@ struct Index {
     .barMode(BarMode.Fixed)
     .barHeight(64)
     .barBackgroundColor(this.theme.palette.cardBackground)
+    .divider({ strokeWidth: 0.5, color: this.theme.palette.track })
     .animationDuration(200)
     .backgroundColor(this.theme.palette.pageBackground)
     .onChange((index: number) => {
@@ -657,7 +658,7 @@ struct Index {
             .width(56)
             .height(30)
             .borderRadius(15)
-            .backgroundColor(this.theme.palette.inputBackground)
+            .backgroundColor(this.theme.palette.accentSoft)
         }
         Text(icon)
           .fontSize(18)
@@ -668,7 +669,7 @@ struct Index {
         .fontSize(11)
         .fontWeight(this.currentTab === index ? FontWeight.Bold : FontWeight.Regular)
         .fontColor(this.currentTab === index ?
-          this.theme.palette.primaryText : this.theme.palette.secondaryText)
+          this.theme.palette.accent : this.theme.palette.secondaryText)
     }
     .width('100%')
     .height('100%')
@@ -714,6 +715,87 @@ struct Index {
 
       Scroll() {
         Column() {
+          // ===== 问候横幅：时段问候 + 日期 + 训练摘要 + 准备度圆环（渐变卡） =====
+          Column() {
+            Row() {
+              Column({ space: 4 }) {
+                Text(this.greeting())
+                  .fontSize(20)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor(this.theme.palette.onHero)
+                Text(this.dateLabel())
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.onHero)
+                  .opacity(0.85)
+                Text(`🔥 连续 ${this.consecutiveTrainingDays()} 天 · ⚡ 本周 ${this.weeklySessionsDone()} 次 · 🎯 ${this.weeklyGoalRate()}%`)
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.onHero)
+                  .margin({ top: 6 })
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              // 准备度圆环（右端大数字）
+              Stack() {
+                Progress({ value: this.readiness === null ? 0 : this.readiness.score, total: 100, type: ProgressType.Ring })
+                  .width(64)
+                  .height(64)
+                  .color(this.theme.palette.onHero)
+                  .backgroundColor(this.theme.palette.heroStart)
+                Column() {
+                  Text(this.readiness === null ? '--' : `${this.readiness.score}`)
+                    .fontSize(18)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor(this.theme.palette.onHero)
+                  Text('准备度')
+                    .fontSize(9)
+                    .fontColor(this.theme.palette.onHero)
+                    .opacity(0.85)
+                }
+              }
+              .accessibilityText(this.readiness === null ? '准备度未知' : `准备度 ${this.readiness.score} 分`)
+            }
+            .width('100%')
+          }
+          .width('100%')
+          .padding(16)
+          .borderRadius(16)
+          .linearGradient({ angle: 135, colors: [[this.theme.palette.heroStart, 0.0], [this.theme.palette.heroEnd, 1.0]] })
+          .shadow({ radius: 14, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 4 })
+          .margin({ bottom: 14 })
+
+          // ===== 快速操作：记训练 / 记一餐 / 画像 / 报表 =====
+          Row({ space: 10 }) {
+            this.quickAction('📝', '记训练', () => {
+              router.pushUrl({ url: 'pages/WorkoutLogPage' })
+                .catch((err: Error) => {
+                  console.error(`openWorkoutLog failed: ${err.message}`);
+                });
+            })
+            this.quickAction('🍚', '记一餐', () => {
+              router.pushUrl({ url: 'pages/FoodPicker' })
+                .then(() => {
+                  this.refreshIntake();
+                })
+                .catch((err: Error) => {
+                  console.error(`openFoodPicker failed: ${err.message}`);
+                });
+            })
+            this.quickAction('👤', '画像', () => {
+              router.pushUrl({ url: 'pages/ProfilePage' })
+                .catch((err: Error) => {
+                  console.error(`openProfile failed: ${err.message}`);
+                });
+            })
+            this.quickAction('📊', '报表', () => {
+              router.pushUrl({ url: 'pages/Report' })
+                .catch((err: Error) => {
+                  console.error(`openReport failed: ${err.message}`);
+                });
+            })
+          }
+          .width('100%')
+          .margin({ bottom: 14 })
+
           // ===== 用户画像卡片（未填写时引导；已填写显示摘要） =====
           SectionCard({ theme: this.theme, title: '用户画像' }) {
             if (this.profile.filled) {
@@ -1029,6 +1111,14 @@ struct Index {
 
       Scroll() {
         Column() {
+          // ===== 今日小贴士（本地内置，按日期轮换） =====
+          SectionCard({ theme: this.theme, title: '💡 今日小贴士' }) {
+            Text(this.todayTip())
+              .fontSize(13)
+              .fontColor(this.theme.palette.primaryText)
+              .lineHeight(20)
+          }
+
           // ===== 数据录入卡片 =====
           SectionCard({ theme: this.theme, title: '运动数据录入' }) {
             // 运动类型下拉
@@ -1149,10 +1239,33 @@ struct Index {
             this.planCards({ report: this.report })
           } else {
             SectionCard({ theme: this.theme, title: '本周训练计划' }) {
-              Text('在「训练」页完成一次运动数据分析后，这里会生成本周训练计划（含休息日与强度轮换）')
-                .fontSize(13)
-                .fontColor(this.theme.palette.secondaryText)
-                .lineHeight(18)
+              Column({ space: 10 }) {
+                Text('🗓️')
+                  .fontSize(44)
+                Text('还没有本周计划')
+                  .fontSize(15)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.theme.palette.primaryText)
+                Text('完成一次运动数据分析后，这里会生成本周训练计划（含休息日与强度轮换）')
+                  .fontSize(13)
+                  .fontColor(this.theme.palette.secondaryText)
+                  .lineHeight(18)
+                  .textAlign(TextAlign.Center)
+                Button('⚡ 去训练页分析')
+                  .fontSize(14)
+                  .fontColor(this.theme.palette.onAccent)
+                  .backgroundColor(this.theme.palette.accent)
+                  .borderRadius(18)
+                  .height(36)
+                  .margin({ top: 4 })
+                  .accessibilityText('切换到训练页进行运动数据分析')
+                  .onClick(() => {
+                    this.currentTab = 1;
+                  })
+              }
+              .width('100%')
+              .alignItems(HorizontalAlign.Center)
+              .padding({ top: 8, bottom: 8 })
             }
           }
 
@@ -1226,6 +1339,74 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor(this.theme.palette.pageBackground)
+  }
+
+  /** 星期几文字（dateLabel 用） */
+  private readonly weekWords: string[] = ['日', '一', '二', '三', '四', '五', '六'];
+
+  /** 训练小贴士（本地内置，按一年中的第几天轮换，确定性无随机） */
+  private readonly trainingTips: string[] = [
+    '训练前 5–10 分钟动态热身，能显著降低受伤风险',
+    '同一个肌群两次训练之间，至少间隔 48 小时',
+    '组间休息：增力 2–3 分钟，增肌 60–90 秒',
+    '蛋白质分摊到每餐 20–40g，吸收利用率更高',
+    '睡眠不足 6 小时时，主动降低训练强度',
+    '渐进超负荷：每周尝试多加 1 次次数或 2.5kg 重量',
+    '训练后 30 分钟内补充碳水 + 蛋白质，恢复更快',
+    '动作质量永远优先于重量，先标准再加重',
+    '有氧安排在力量训练之后，避免影响力量表现',
+    '连续高强度训练 3 天以上，安排一个主动恢复日'
+  ];
+
+  /** 时段问候语（按当前小时） */
+  private greeting(): string {
+    const hour: number = new Date().getHours();
+    if (hour < 6) {
+      return '夜深了 🌙';
+    }
+    if (hour < 11) {
+      return '早上好 ☀️';
+    }
+    if (hour < 14) {
+      return '中午好 🍚';
+    }
+    if (hour < 18) {
+      return '下午好 💪';
+    }
+    return '晚上好 🌙';
+  }
+
+  /** 今日日期标签（M月D日 周X） */
+  private dateLabel(): string {
+    const now: Date = new Date();
+    return `${now.getMonth() + 1}月${now.getDate()}日 周${this.weekWords[now.getDay()]}`;
+  }
+
+  /** 今日小贴士（按一年中的第几天轮换） */
+  private todayTip(): string {
+    const now: Date = new Date();
+    const start: Date = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear: number = Math.floor((now.getTime() - start.getTime()) / 86400000);
+    return this.trainingTips[dayOfYear % this.trainingTips.length];
+  }
+
+  /** 快速操作圆角按钮（首页横幅下方一行四个） */
+  @Builder
+  private quickAction(icon: string, label: string, action: () => void): void {
+    Column({ space: 6 }) {
+      Text(icon)
+        .fontSize(20)
+      Text(label)
+        .fontSize(11)
+        .fontColor(this.theme.palette.primaryText)
+    }
+    .layoutWeight(1)
+    .padding({ top: 12, bottom: 12 })
+    .borderRadius(14)
+    .backgroundColor(this.theme.palette.cardBackground)
+    .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 3 })
+    .accessibilityText(label)
+    .onClick(action)
   }
 
   /** 负荷状态 → 语义色（色值来自调色板，非硬编码） */
