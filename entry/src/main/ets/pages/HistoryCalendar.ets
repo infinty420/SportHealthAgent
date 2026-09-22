@@ -12,7 +12,7 @@
 import { common } from '@kit.AbilityKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { PerspectiveProjector, ProjectedPoint } from '../utils/PerspectiveProjector';
+import { HeatColorUtil } from '../utils/HeatColorUtil';
 import { BodyPathData } from '../data/BodyPathData';
 import { SectionCard } from '../components/SectionCard';
 import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
@@ -110,12 +110,8 @@ export struct HistoryCalendar {
   /** 部位点击气泡（2 秒自动消失） */
   @State private heatTip: string = '';
   @State private heatTipVisible: boolean = false;
-  /** 部位点击命中区域（路径键 → 投影后像素多边形） */
-  private heatHitMap: Map<string, number[][]> = new Map<string, number[][]>();
-  // 自动摆动（±3°，40ms 一帧）
-  private swingAngle: number = 0;
-  private swingDir: number = 1;
-  private swingTimer: number = -1;
+  /** 部位点击命中区域（色斑键 → [cx, cy, r] 像素坐标） */
+  private heatHitMap: Map<string, number[]> = new Map<string, number[]>();
 
   aboutToAppear(): void {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
@@ -447,11 +443,13 @@ export struct HistoryCalendar {
     return latest.length === 0 ? '-' : latest;
   }
 
-  /** 部位点击：命中检测 → 弹出统计气泡，2 秒后自动消失 */
+  /** 部位点击：按色斑圆心距离命中 → 弹出统计气泡，2 秒后自动消失 */
   private onHeatTap(x: number, y: number): void {
     let hitGroup: string = '';
-    this.heatHitMap.forEach((points: number[][], key: string) => {
-      if (hitGroup.length === 0 && PerspectiveProjector.hitPolygon(x, y, points)) {
+    this.heatHitMap.forEach((spot: number[], key: string) => {
+      const dx: number = x - spot[0];
+      const dy: number = y - spot[1];
+      if (hitGroup.length === 0 && dx * dx + dy * dy <= (spot[2] + 6) * (spot[2] + 6)) {
         hitGroup = BodyPathData.groupOf(key);
       }
     });
@@ -469,28 +467,6 @@ export struct HistoryCalendar {
     setTimeout(() => {
       this.heatTipVisible = false;
     }, 2000);
-  }
-
-  /** 启动 2.5D 热力图自动摆动（±3° 往返，40ms 一帧） */
-  private startSwing(): void {
-    if (this.swingTimer >= 0) {
-      return;
-    }
-    this.swingTimer = setInterval(() => {
-      this.swingAngle += 0.15 * this.swingDir;
-      if (Math.abs(this.swingAngle) >= 3) {
-        this.swingDir = -this.swingDir;
-      }
-      this.drawHeat();
-    }, 40);
-  }
-
-  /** 组件销毁：停止摆动动画定时器 */
-  aboutToDisappear(): void {
-    if (this.swingTimer >= 0) {
-      clearInterval(this.swingTimer);
-      this.swingTimer = -1;
-    }
   }
 
   /** 环形图分段色（调色板轮换） */
@@ -523,104 +499,47 @@ export struct HistoryCalendar {
     return bold ? `bold ${px}px sans-serif` : `${px}px sans-serif`;
   }
 
-  /** 绘制 2.5D 立体人体热力（正面 + 背面），颜色按当前指标档位，整体随 swingAngle 摆动 */
+  /** 绘制热力发光色斑（叠加在真人轮廓底图上），颜色按当前指标档位 */
   private drawHeat(): void {
     const ctx: CanvasRenderingContext2D = this.heatCtx;
     ctx.clearRect(0, 0, 320, 190);
-    // 图注
+    // 图注（与底图两个人体居中对齐）
     ctx.fillStyle = this.theme.palette.secondaryText;
     ctx.font = this.canvasFont(12, false);
     ctx.textAlign = 'center';
-    ctx.fillText('正面', 80, 12);
-    ctx.fillText('背面', 240, 12);
-    // 命中区域每次重绘重建（投影随摆动变化）
+    ctx.fillText('正面', 100, 12);
+    ctx.fillText('背面', 220, 12);
+    // 命中区域每次重绘重建
     this.heatHitMap.clear();
-    // 正面组整体倾斜 +swingAngle，背面组 -swingAngle（自动摆动 ±3°）
-    this.drawBody25D(ctx, BodyPathData.getFrontPaths(), 30, 22, this.swingAngle);
-    this.drawBody25D(ctx, BodyPathData.getBackPaths(), 190, 22, -this.swingAngle);
+    this.drawSpots(ctx, BodyPathData.getFrontSpots(), 100);
+    this.drawSpots(ctx, BodyPathData.getBackSpots(), 220);
   }
 
-  /** 单个人体：透视投影 + 45° 明暗渐变 + 底部投影 + 高频高光 + 选中描边 + 训练日红点标记 */
-  private drawBody25D(ctx: CanvasRenderingContext2D, paths: Map<string, number[][]>,
-    originX: number, originY: number, tiltDeg: number): void {
-    const bodyW: number = 100;
-    const bodyH: number = 158;
-    const vanishingX: number = originX + bodyW / 2;
-    const vanishingY: number = originY - 16;
-    const rad: number = tiltDeg * Math.PI / 180;
-    ctx.save();
-    ctx.transform(1, Math.sin(rad), Math.sin(rad), 1, 0, 0);
-    paths.forEach((points: number[][], key: string) => {
+  /** 单个人体的热力色斑：径向渐变发光 + 选中描边 + 训练日红点标记 */
+  private drawSpots(ctx: CanvasRenderingContext2D, spots: Map<string, number[]>, centerX: number): void {
+    const bodyW: number = 95;
+    const bodyH: number = 190;
+    spots.forEach((spot: number[], key: string) => {
       const group: string = BodyPathData.groupOf(key);
       const tier: number = this.metricTierOf(group);
       const base: string = this.metricColor(group);
-      const z: number = BodyPathData.depthOf(key);
-      // 归一化坐标 → 画布坐标 → 透视投影，同时记录包围盒
-      const projected: number[][] = [];
-      let minX: number = 1000;
-      let minY: number = 1000;
-      let maxX: number = -1000;
-      let maxY: number = -1000;
-      points.forEach((pt: number[]) => {
-        const sx: number = originX + pt[0] / 100 * bodyW;
-        const sy: number = originY + pt[1] / 100 * bodyH;
-        const pp: ProjectedPoint = PerspectiveProjector.project(sx, sy, z, vanishingX, vanishingY);
-        projected.push([pp.px, pp.py]);
-        minX = Math.min(minX, pp.px);
-        minY = Math.min(minY, pp.py);
-        maxX = Math.max(maxX, pp.px);
-        maxY = Math.max(maxY, pp.py);
-      });
+      const cx: number = centerX + (spot[0] - 50) / 100 * bodyW;
+      const cy: number = spot[1] / 100 * bodyH;
+      const r: number = spot[2] / 100 * bodyW * 1.15;
       // 部位点击命中区域（像素坐标）
-      this.heatHitMap.set(key, projected);
-      // 部位路径
-      ctx.beginPath();
-      projected.forEach((pt: number[], idx: number) => {
-        if (idx === 0) {
-          ctx.moveTo(pt[0], pt[1]);
-        } else {
-          ctx.lineTo(pt[0], pt[1]);
-        }
-      });
-      ctx.closePath();
-      // 左上 45° 明暗渐变（浅色在上、深色在下，明暗由调色板基色推导）
-      const gradient: CanvasGradient = ctx.createLinearGradient(minX, minY, maxX, maxY);
-      gradient.addColorStop(0, PerspectiveProjector.shadeColor(base, 0.35));
-      gradient.addColorStop(1, PerspectiveProjector.shadeColor(base, -0.25));
+      this.heatHitMap.set(key, [cx, cy, r]);
+      // 径向渐变发光斑（中心亮、边缘淡出，颜色由调色板基色推导）
+      const gradient: CanvasGradient = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
+      gradient.addColorStop(0, HeatColorUtil.alphaColor(HeatColorUtil.shadeColor(base, 0.15), tier > 0 ? 0.8 : 0.4));
+      gradient.addColorStop(1, HeatColorUtil.alphaColor(base, 0.04));
       ctx.fillStyle = gradient;
-      ctx.fill();
-      // 底部投影（深色半透明椭圆，向下偏移 2px）
-      ctx.save();
-      ctx.globalAlpha = 0.15;
-      ctx.fillStyle = this.theme.palette.primaryText;
       ctx.beginPath();
-      ctx.ellipse((minX + maxX) / 2, maxY + 2, Math.max(2, (maxX - minX) / 2), 3, 0, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
-      // 高频部位（第 3 档）叠加 45° 斜向高光条（裁剪在部位路径内）
-      if (tier >= 2) {
-        ctx.save();
-        ctx.clip();
-        ctx.globalAlpha = 0.2;
-        ctx.strokeStyle = this.theme.palette.onHero;
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(minX - 4, maxY + 4);
-        ctx.lineTo(maxX + 4, minY - 4);
-        ctx.stroke();
-        ctx.restore();
-      }
       // 部位图例点击选中：描边高亮
       if (this.heatHighlight === group) {
         ctx.beginPath();
-        projected.forEach((pt: number[], idx: number) => {
-          if (idx === 0) {
-            ctx.moveTo(pt[0], pt[1]);
-          } else {
-            ctx.lineTo(pt[0], pt[1]);
-          }
-        });
-        ctx.closePath();
+        ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
         ctx.strokeStyle = this.theme.palette.accent;
         ctx.lineWidth = 2;
         ctx.stroke();
@@ -628,11 +547,9 @@ export struct HistoryCalendar {
       // 训练日标记：有训练的部位中心画红点 + 频次数（成对部位只在左侧画一次）
       const stat: MuscleStat | null = this.statOf(group);
       if (stat !== null && stat.sessions > 0 && !key.endsWith('右')) {
-        const cx: number = (minX + maxX) / 2;
-        const cy: number = (minY + maxY) / 2;
         ctx.beginPath();
         ctx.fillStyle = this.theme.palette.danger;
-        ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = this.theme.palette.onHero;
         ctx.font = this.canvasFont(10, true);
@@ -640,7 +557,6 @@ export struct HistoryCalendar {
         ctx.fillText(`${stat.sessions}`, cx, cy + 3);
       }
     });
-    ctx.restore();
   }
 
   /** 绘制部位组数环形图（中心显示总组数） */
@@ -926,7 +842,20 @@ export struct HistoryCalendar {
               }
               .width('100%')
               .margin({ top: 4, bottom: 6 })
+              // 真人轮廓底图 + Canvas 热力发光斑叠加
               Stack() {
+                Row({ space: 24 }) {
+                  Image($r('app.media.body_front'))
+                    .width(95)
+                    .height(190)
+                    .objectFit(ImageFit.Contain)
+                  Image($r('app.media.body_back'))
+                    .width(95)
+                    .height(190)
+                    .objectFit(ImageFit.Contain)
+                }
+                .width('100%')
+                .justifyContent(FlexAlign.Center)
                 Canvas(this.heatCtx)
                   .width('100%')
                   .height(190)
@@ -934,7 +863,6 @@ export struct HistoryCalendar {
                   .accessibilityText('部位热力图，点击部位查看统计')
                   .onReady(() => {
                     this.drawHeat();
-                    this.startSwing();
                   })
                   .onClick((event: ClickEvent) => {
                     this.onHeatTap(event.x, event.y);
@@ -950,7 +878,9 @@ export struct HistoryCalendar {
                     .margin({ top: 6, left: 6 })
                 }
               }
-              .width('100%')
+              .width(320)
+              .height(190)
+              .alignSelf(ItemAlign.Center)
               .align(Alignment.TopStart)
               // 图例：色阶标签随指标切换
               Row({ space: 14 }) {

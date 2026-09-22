@@ -34,7 +34,7 @@ import { ReadinessScorer, ReadinessInput, ReadinessReport } from '../agent/rules
 import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/MuscleBalanceAnalyzer';
 import { StrengthCalculator } from '../agent/rules/StrengthCalculator';
 import { HEAT_MUSCLE_GROUPS } from '../agent/rules/TrainingStatsAggregator';
-import { PerspectiveProjector, ProjectedPoint } from '../utils/PerspectiveProjector';
+import { HeatColorUtil } from '../utils/HeatColorUtil';
 import { BodyPathData } from '../data/BodyPathData';
 import { AnalysisReport, WeeklyPlanDay } from '../agent/AnalysisResult';
 import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
@@ -106,10 +106,6 @@ struct Index {
   @State heatCanvasKey: string = 'heat-0';
   /** 部位图例点击选中（描边高亮；空串表示未选中） */
   @State heatHighlight: string = '';
-  // 2.5D 热力图自动摆动（±3°，40ms 一帧；仅首页 Tab 可见时重绘）
-  private swingAngle: number = 0;
-  private swingDir: number = 1;
-  private swingTimer: number = -1;
   private heatCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
 
   // 用户画像与目标
@@ -186,30 +182,6 @@ struct Index {
     this.applyInjuries();
     this.refreshIntake();
     this.refreshMuscleHeat();
-  }
-
-  /** 页面销毁：停止热力图摆动动画定时器 */
-  aboutToDisappear(): void {
-    if (this.swingTimer >= 0) {
-      clearInterval(this.swingTimer);
-      this.swingTimer = -1;
-    }
-  }
-
-  /** 启动 2.5D 热力图自动摆动（±3° 往返，40ms 一帧；切走首页 Tab 时暂停重绘） */
-  private startSwing(): void {
-    if (this.swingTimer >= 0) {
-      return;
-    }
-    this.swingTimer = setInterval(() => {
-      this.swingAngle += 0.15 * this.swingDir;
-      if (Math.abs(this.swingAngle) >= 3) {
-        this.swingDir = -this.swingDir;
-      }
-      if (this.currentTab === 0 && this.heatTotal() > 0) {
-        this.drawMuscleHeat();
-      }
-    }, 40);
   }
 
   /** 读取当前伤病部位并注入两个引擎（影响计划生成与补强推荐的禁忌过滤） */
@@ -403,106 +375,48 @@ struct Index {
     return bold ? `bold ${px}px sans-serif` : `${px}px sans-serif`;
   }
 
-  /** 绘制 2.5D 立体人体热力（正面 + 背面），颜色反映本周各部位有效组数，整体随 swingAngle 摆动 */
+  /** 绘制热力发光色斑（叠加在真人轮廓底图上），颜色反映本周各部位有效组数 */
   private drawMuscleHeat(): void {
     const ctx: CanvasRenderingContext2D = this.heatCtx;
     ctx.clearRect(0, 0, 320, 190);
-    // 图注
+    // 图注（与底图两个人体居中对齐）
     ctx.fillStyle = this.theme.palette.secondaryText;
     ctx.font = this.canvasFont(12, false);
     ctx.textAlign = 'center';
-    ctx.fillText('正面', 80, 12);
-    ctx.fillText('背面', 240, 12);
-    // 正面组整体倾斜 +swingAngle，背面组 -swingAngle（自动摆动 ±3°）
-    this.drawBody25D(ctx, BodyPathData.getFrontPaths(), 30, 22, this.swingAngle);
-    this.drawBody25D(ctx, BodyPathData.getBackPaths(), 190, 22, -this.swingAngle);
+    ctx.fillText('正面', 100, 12);
+    ctx.fillText('背面', 220, 12);
+    this.drawSpots(ctx, BodyPathData.getFrontSpots(), 100);
+    this.drawSpots(ctx, BodyPathData.getBackSpots(), 220);
   }
 
-  /** 单个人体：透视投影（近大远小）+ 45° 明暗渐变 + 底部投影 + 高频高光 + 选中描边 */
-  private drawBody25D(ctx: CanvasRenderingContext2D, paths: Map<string, number[][]>,
-    originX: number, originY: number, tiltDeg: number): void {
-    const bodyW: number = 100;
-    const bodyH: number = 158;
-    const vanishingX: number = originX + bodyW / 2;
-    const vanishingY: number = originY - 16;
-    const rad: number = tiltDeg * Math.PI / 180;
-    ctx.save();
-    ctx.transform(1, Math.sin(rad), Math.sin(rad), 1, 0, 0);
-    paths.forEach((points: number[][], key: string) => {
+  /** 单个人体的热力色斑：径向渐变发光 + 选中描边（底图为真人轮廓 PNG） */
+  private drawSpots(ctx: CanvasRenderingContext2D, spots: Map<string, number[]>, centerX: number): void {
+    const bodyW: number = 95;
+    const bodyH: number = 190;
+    spots.forEach((spot: number[], key: string) => {
       const group: string = BodyPathData.groupOf(key);
       const sets: number = this.heatOfGroup(group);
       const base: string = this.heatColor(sets);
-      const z: number = BodyPathData.depthOf(key);
-      // 归一化坐标 → 画布坐标 → 透视投影，同时记录包围盒
-      const projected: number[][] = [];
-      let minX: number = 1000;
-      let minY: number = 1000;
-      let maxX: number = -1000;
-      let maxY: number = -1000;
-      points.forEach((pt: number[]) => {
-        const sx: number = originX + pt[0] / 100 * bodyW;
-        const sy: number = originY + pt[1] / 100 * bodyH;
-        const pp: ProjectedPoint = PerspectiveProjector.project(sx, sy, z, vanishingX, vanishingY);
-        projected.push([pp.px, pp.py]);
-        minX = Math.min(minX, pp.px);
-        minY = Math.min(minY, pp.py);
-        maxX = Math.max(maxX, pp.px);
-        maxY = Math.max(maxY, pp.py);
-      });
-      // 部位路径
-      ctx.beginPath();
-      projected.forEach((pt: number[], idx: number) => {
-        if (idx === 0) {
-          ctx.moveTo(pt[0], pt[1]);
-        } else {
-          ctx.lineTo(pt[0], pt[1]);
-        }
-      });
-      ctx.closePath();
-      // 左上 45° 明暗渐变（浅色在上、深色在下，明暗由调色板基色推导）
-      const gradient: CanvasGradient = ctx.createLinearGradient(minX, minY, maxX, maxY);
-      gradient.addColorStop(0, PerspectiveProjector.shadeColor(base, 0.35));
-      gradient.addColorStop(1, PerspectiveProjector.shadeColor(base, -0.25));
+      const cx: number = centerX + (spot[0] - 50) / 100 * bodyW;
+      const cy: number = spot[1] / 100 * bodyH;
+      const r: number = spot[2] / 100 * bodyW * 1.15;
+      // 径向渐变发光斑（中心亮、边缘淡出，颜色由调色板基色推导）
+      const gradient: CanvasGradient = ctx.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
+      gradient.addColorStop(0, HeatColorUtil.alphaColor(HeatColorUtil.shadeColor(base, 0.15), sets > 0 ? 0.8 : 0.4));
+      gradient.addColorStop(1, HeatColorUtil.alphaColor(base, 0.04));
       ctx.fillStyle = gradient;
-      ctx.fill();
-      // 底部投影（深色半透明椭圆，向下偏移 2px）
-      ctx.save();
-      ctx.globalAlpha = 0.15;
-      ctx.fillStyle = this.theme.palette.primaryText;
       ctx.beginPath();
-      ctx.ellipse((minX + maxX) / 2, maxY + 2, Math.max(2, (maxX - minX) / 2), 3, 0, 0, Math.PI * 2);
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
-      // 高频部位（≥5 组）叠加 45° 斜向高光条（裁剪在部位路径内）
-      if (sets >= 5) {
-        ctx.save();
-        ctx.clip();
-        ctx.globalAlpha = 0.2;
-        ctx.strokeStyle = this.theme.palette.onHero;
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(minX - 4, maxY + 4);
-        ctx.lineTo(maxX + 4, minY - 4);
-        ctx.stroke();
-        ctx.restore();
-      }
       // 部位图例点击选中：描边高亮
       if (this.heatHighlight === group) {
         ctx.beginPath();
-        projected.forEach((pt: number[], idx: number) => {
-          if (idx === 0) {
-            ctx.moveTo(pt[0], pt[1]);
-          } else {
-            ctx.lineTo(pt[0], pt[1]);
-          }
-        });
-        ctx.closePath();
+        ctx.arc(cx, cy, r + 2, 0, Math.PI * 2);
         ctx.strokeStyle = this.theme.palette.accent;
         ctx.lineWidth = 2;
         ctx.stroke();
       }
     });
-    ctx.restore();
   }
 
   /** 重载用户画像并注入引擎与录入源 */
@@ -1046,15 +960,32 @@ struct Index {
                 .fontColor(this.theme.palette.secondaryText)
                 .lineHeight(18)
             } else {
-              Canvas(this.heatCtx)
+              // 真人轮廓底图 + Canvas 热力发光斑叠加
+              Stack() {
+                Row({ space: 24 }) {
+                  Image($r('app.media.body_front'))
+                    .width(95)
+                    .height(190)
+                    .objectFit(ImageFit.Contain)
+                  Image($r('app.media.body_back'))
+                    .width(95)
+                    .height(190)
+                    .objectFit(ImageFit.Contain)
+                }
                 .width('100%')
-                .height(190)
-                .key(this.heatCanvasKey)
-                .accessibilityText('本周肌群容量热力图')
-                .onReady(() => {
-                  this.drawMuscleHeat();
-                  this.startSwing();
-                })
+                .justifyContent(FlexAlign.Center)
+                Canvas(this.heatCtx)
+                  .width('100%')
+                  .height(190)
+                  .key(this.heatCanvasKey)
+                  .accessibilityText('本周肌群容量热力图')
+                  .onReady(() => {
+                    this.drawMuscleHeat();
+                  })
+              }
+              .width(320)
+              .height(190)
+              .alignSelf(ItemAlign.Center)
               // 图例：有效组数分档
               Row({ space: 14 }) {
                 this.legendChip(this.theme.palette.track, '0 组')
