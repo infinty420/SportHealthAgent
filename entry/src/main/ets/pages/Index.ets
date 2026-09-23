@@ -1356,12 +1356,13 @@ struct Index {
             SectionCard({ theme: this.theme, title: '餐时机与碳水循环' }) {
               ForEach(this.timingLines, (line: string, idx: number) => {
                 Row({ space: 10 }) {
-                  Column() {
+                  Column({ space: 3 }) {
                     Circle({ width: 8, height: 8 })
                       .fill(this.theme.palette.accent)
+                    // 时间轴连接线：固定高度，避免 layoutWeight 在滚动容器里无限拉伸
                     Row()
                       .width(2)
-                      .layoutWeight(1)
+                      .height(14)
                       .backgroundColor(idx === this.timingLines.length - 1 ?
                         this.theme.palette.cardBackground : this.theme.palette.track)
                   }
@@ -1376,7 +1377,7 @@ struct Index {
                 .width('100%')
                 .alignItems(VerticalAlign.Top)
                 .margin({ bottom: 6 })
-              }, (line: string) => line)
+              }, (line: string, idx: number): string => `${idx}-${line}`)
               Text(this.carbLine)
                 .fontSize(12)
                 .fontColor(this.theme.palette.accent)
