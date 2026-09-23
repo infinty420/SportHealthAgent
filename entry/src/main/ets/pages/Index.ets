@@ -188,6 +188,10 @@ struct Index {
   // 规则 DSL 状态：加重步长 + 互补映射草稿（与 SPORT_TYPE_LIST 等长对齐）
   @State weightStepKg: number = 2.5;
   @State complementaryDrafts: string[] = [];
+  // 互补映射简易编辑器：当前选中的运动类型下标 / 输入框文本 / 已配置规则 chips
+  @State ruleTypeIndex: number = 0;
+  @State ruleWorkoutText: string = '';
+  @State customRuleChips: ComplementaryRule[] = [];
   private ruleTableStore: RuleTableStore | null = null;
 
   /** 页面创建：初始化本地存储，恢复设置/画像/目标与历史 */
@@ -215,6 +219,7 @@ struct Index {
       const hit: string | undefined = ruleMap.get(type);
       return hit === undefined ? '' : hit;
     });
+    this.customRuleChips = ruleTable.complementary;
     const config: RuleConfig = this.settingsStore.load();
     this.highThreshold = config.highThreshold;
     this.normalThreshold = config.normalThreshold;
@@ -834,6 +839,34 @@ struct Index {
     };
     this.ruleTableStore.save(table);
     RuleTableStore.applyStatics(table);
+    this.customRuleChips = rules;
+  }
+
+  /** 保存当前编辑的互补映射（文本为空 = 清除该类型的自定义，恢复内置推荐） */
+  private saveComplementaryRule(): void {
+    const drafts: string[] = this.complementaryDrafts.slice();
+    while (drafts.length < SPORT_TYPE_LIST.length) {
+      drafts.push('');
+    }
+    drafts[this.ruleTypeIndex] = this.ruleWorkoutText.trim();
+    this.complementaryDrafts = drafts;
+    this.applyRuleTable();
+    this.ruleWorkoutText = '';
+  }
+
+  /** 移除一条已配置的互补映射 */
+  private removeComplementaryRule(sportType: string): void {
+    const index: number = SPORT_TYPE_LIST.indexOf(sportType);
+    if (index < 0) {
+      return;
+    }
+    const drafts: string[] = this.complementaryDrafts.slice();
+    while (drafts.length < SPORT_TYPE_LIST.length) {
+      drafts.push('');
+    }
+    drafts[index] = '';
+    this.complementaryDrafts = drafts;
+    this.applyRuleTable();
   }
 
 
@@ -1898,38 +1931,82 @@ struct Index {
             .width('100%')
             .margin({ top: 6, bottom: 8 })
 
-            Text('互补训练映射（留空 = 走内置规则表）')
+            Text('练完某项后，下次想练什么？（不设置 = 用内置推荐）')
               .fontSize(13)
               .fontColor(this.theme.palette.secondaryText)
-              .margin({ bottom: 4 })
-            ForEach(SPORT_TYPE_LIST, (type: string, index: number) => {
-              Row({ space: 8 }) {
-                Text(type)
-                  .fontSize(12)
-                  .fontColor(this.theme.palette.primaryText)
-                  .width(72)
-                TextInput({ placeholder: '默认互补', text: index < this.complementaryDrafts.length ? this.complementaryDrafts[index] : '' })
-                  .fontSize(12)
-                  .fontColor(this.theme.palette.primaryText)
-                  .placeholderColor(this.theme.palette.secondaryText)
-                  .backgroundColor(this.theme.palette.inputBackground)
-                  .borderRadius(8)
-                  .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-                  .layoutWeight(1)
-                  .accessibilityText(`自定义${type}的互补训练类型`)
-                  .onChange((v: string) => {
-                    const drafts: string[] = this.complementaryDrafts.slice();
-                    while (drafts.length < SPORT_TYPE_LIST.length) {
-                      drafts.push('');
-                    }
-                    drafts[index] = v;
-                    this.complementaryDrafts = drafts;
-                    this.applyRuleTable();
-                  })
+              .margin({ bottom: 6 })
+            // 简易编辑器：下拉选「这次练的」→ 输入「下次想练的」→ 保存
+            Row({ space: 8 }) {
+              Select(this.buildSportOptions())
+                .value(SPORT_TYPE_LIST[this.ruleTypeIndex])
+                .fontColor(this.theme.palette.primaryText)
+                .backgroundColor(this.theme.palette.inputBackground)
+                .layoutWeight(1)
+                .accessibilityText('选择本次训练类型')
+                .onSelect((index: number) => {
+                  this.ruleTypeIndex = index;
+                  this.ruleWorkoutText = index < this.complementaryDrafts.length ?
+                    this.complementaryDrafts[index] : '';
+                })
+              Text('→')
+                .fontSize(14)
+                .fontColor(this.theme.palette.secondaryText)
+              TextInput({ placeholder: '例如：上肢力量', text: this.ruleWorkoutText })
+                .fontSize(12)
+                .fontColor(this.theme.palette.primaryText)
+                .placeholderColor(this.theme.palette.secondaryText)
+                .backgroundColor(this.theme.palette.inputBackground)
+                .borderRadius(8)
+                .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                .layoutWeight(1.4)
+                .accessibilityText('输入下次想练的内容')
+                .onChange((v: string) => {
+                  this.ruleWorkoutText = v;
+                })
+            }
+            .width('100%')
+            .margin({ bottom: 8 })
+            Button(this.ruleWorkoutText.trim().length > 0 ? '保存这条规则' : '清空该类型的自定义')
+              .fontSize(13)
+              .fontColor(this.theme.palette.onAccent)
+              .backgroundColor(this.theme.palette.accent)
+              .borderRadius(16)
+              .height(32)
+              .width('100%')
+              .accessibilityText('保存互补训练规则')
+              .onClick(() => {
+                this.saveComplementaryRule();
+              })
+            // 已配置的自定义规则（chips，点 ✕ 删除恢复内置）
+            if (this.customRuleChips.length > 0) {
+              Flex({ wrap: FlexWrap.Wrap }) {
+                ForEach(this.customRuleChips, (rule: ComplementaryRule) => {
+                  Row({ space: 4 }) {
+                    Text(`${rule.sportType} → ${rule.workoutType}`)
+                      .fontSize(12)
+                      .fontColor(this.theme.palette.accent)
+                    Text('✕')
+                      .fontSize(12)
+                      .fontColor(this.theme.palette.secondaryText)
+                      .padding(2)
+                      .accessibilityText(`删除${rule.sportType}的自定义规则`)
+                      .onClick(() => {
+                        this.removeComplementaryRule(rule.sportType);
+                      })
+                  }
+                  .padding({ left: 10, right: 8, top: 5, bottom: 5 })
+                  .borderRadius(14)
+                  .backgroundColor(this.theme.palette.accentSoft)
+                  .margin({ right: 8, top: 8 })
+                }, (rule: ComplementaryRule): string => rule.sportType)
               }
               .width('100%')
-              .margin({ bottom: 6 })
-            }, (type: string): string => type)
+            } else {
+              Text('当前没有自定义规则，全部按内置互补推荐执行')
+                .fontSize(11)
+                .fontColor(this.theme.palette.secondaryText)
+                .margin({ top: 8 })
+            }
             Row({ space: 8 }) {
               Text('引擎对比')
                 .fontSize(13)
