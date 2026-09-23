@@ -83,6 +83,34 @@
     {
       "name": "profile_saved",
       "value": "画像已保存，引擎将按你的情况个性化建议"
+    },
+    {
+      "name": "app_title",
+      "value": "衡练 · 运动健康 Agent"
+    },
+    {
+      "name": "app_subtitle",
+      "value": "端侧规则引擎 · 不联网 · 非医疗诊断"
+    },
+    {
+      "name": "tab_home",
+      "value": "首页"
+    },
+    {
+      "name": "tab_train",
+      "value": "训练"
+    },
+    {
+      "name": "tab_plan",
+      "value": "计划"
+    },
+    {
+      "name": "tab_library",
+      "value": "动作库"
+    },
+    {
+      "name": "tab_discover",
+      "value": "发现"
     }
   ]
 }

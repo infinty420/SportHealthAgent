@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "On-device sports & health agent: rule engine only, fully offline"
+      "value": "On-device sports & health agent: pure rule engine, fully offline"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "HengLian sports & health agent entry"
+      "value": "HengLian · Sports & Health Agent main entry"
     },
     {
       "name": "EntryAbility_label",
@@ -14,11 +14,11 @@
     },
     {
       "name": "health_permission_reason",
-      "value": "Used to read workout data (duration/heart rate/pace/calories/load) from your smartwatch. Analyzed locally only, never uploaded."
+      "value": "Reads workout data (duration/heart rate/pace/calories/training load) from your smartwatch for on-device analysis only; nothing is uploaded"
     },
     {
       "name": "food_picker_title",
-      "value": "Pick a Food"
+      "value": "Pick a food"
     },
     {
       "name": "food_picker_search",
@@ -26,7 +26,7 @@
     },
     {
       "name": "food_picker_grams",
-      "value": "Amount (g)"
+      "value": "Portion (g)"
     },
     {
       "name": "food_picker_meal",
@@ -34,11 +34,11 @@
     },
     {
       "name": "food_picker_add",
-      "value": "Add to today"
+      "value": "Add to today's diet"
     },
     {
       "name": "food_picker_added",
-      "value": "Logged to today's diet"
+      "value": "Added to today's diet"
     },
     {
       "name": "report_title",
@@ -58,15 +58,15 @@
     },
     {
       "name": "report_duration",
-      "value": "Total minutes"
+      "value": "Total duration (min)"
     },
     {
       "name": "report_calories",
-      "value": "Total kcal"
+      "value": "Total calories (kcal)"
     },
     {
       "name": "report_avg_load",
-      "value": "Avg load"
+      "value": "Average load"
     },
     {
       "name": "report_goal_rate",
@@ -74,7 +74,7 @@
     },
     {
       "name": "report_empty",
-      "value": "No data yet. Finish one workout analysis to generate the report."
+      "value": "No data yet. Complete one training analysis to generate the report"
     },
     {
       "name": "profile_title",
@@ -82,7 +82,35 @@
     },
     {
       "name": "profile_saved",
-      "value": "Profile saved. The engine will personalize suggestions for you."
+      "value": "Profile saved. The engine will personalize suggestions for you"
+    },
+    {
+      "name": "app_title",
+      "value": "HengLian · Sports & Health Agent"
+    },
+    {
+      "name": "app_subtitle",
+      "value": "On-device rule engine · Offline · Not medical advice"
+    },
+    {
+      "name": "tab_home",
+      "value": "Home"
+    },
+    {
+      "name": "tab_train",
+      "value": "Train"
+    },
+    {
+      "name": "tab_plan",
+      "value": "Plan"
+    },
+    {
+      "name": "tab_library",
+      "value": "Library"
+    },
+    {
+      "name": "tab_discover",
+      "value": "Explore"
     }
   ]
 }

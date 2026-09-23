@@ -6,8 +6,10 @@
  * 主题约束：本文件不出现任何硬编码色值，一律读取 theme.palette.*。
  * 文案约束：页面级文案走 string.json 资源（中英双语）。
  */
-import { router } from '@kit.ArkUI';
+import { router, promptAction } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
+import { image } from '@kit.ImageKit';
+import { fileIo as fs } from '@kit.CoreFileKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { HistoryStore, HistoryEntry, PeriodStats } from '../data/HistoryStore';
 import { GoalStore, TrainingGoal } from '../data/GoalStore';
@@ -486,6 +488,81 @@ struct ReportPage {
     return Math.min(100, Math.round(Math.min(sessionRate, durationRate)));
   }
 
+  /**
+   * 分享卡（4.4）：OffscreenCanvas 离屏绘制周报摘要 → PixelMap → PNG 存沙箱。
+   * 不调系统分享面板、不联网；图片路径通过 Toast 告知，可在文件管理器中自取。
+   * 颜色全部来自 theme.palette，不在此处硬编码色值。
+   */
+  private exportShareCard(): void {
+    const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+    const width: number = 600;
+    const height: number = 420;
+    const canvas: OffscreenCanvas = new OffscreenCanvas(width, height);
+    const ctx: OffscreenCanvasRenderingContext2D =
+      canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+
+    // 背景与标题
+    ctx.fillStyle = this.theme.palette.cardBackground;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = this.theme.palette.accent;
+    ctx.fillRect(0, 0, width, 8);
+    ctx.fillStyle = this.theme.palette.primaryText;
+    ctx.font = 'bold 32px sans-serif';
+    ctx.fillText('衡练 · 训练周报', 32, 64);
+    ctx.font = '20px sans-serif';
+    ctx.fillStyle = this.theme.palette.secondaryText;
+    const today: Date = new Date();
+    ctx.fillText(`${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()} 生成 · 端侧本地数据`, 32, 98);
+
+    // 四项核心统计
+    ctx.fillStyle = this.theme.palette.accent;
+    ctx.font = 'bold 40px sans-serif';
+    ctx.fillText(`${this.stats.sessions}`, 40, 180);
+    ctx.fillText(`${this.stats.totalDurationMin}`, 320, 180);
+    ctx.fillText(`${this.stats.totalCalories}`, 40, 300);
+    ctx.fillText(`${this.stats.avgLoad}`, 320, 300);
+    ctx.font = '20px sans-serif';
+    ctx.fillStyle = this.theme.palette.secondaryText;
+    ctx.fillText('训练次数', 40, 210);
+    ctx.fillText('总时长（分钟）', 320, 210);
+    ctx.fillText('总热量（千卡）', 40, 330);
+    ctx.fillText('平均负荷', 320, 330);
+
+    // 连续天数与周目标
+    ctx.fillStyle = this.theme.palette.success;
+    ctx.font = 'bold 24px sans-serif';
+    ctx.fillText(`连续训练 ${this.streak} 天 · 周目标达成 ${this.goalRate()}%`, 32, 384);
+
+    // 像素数据 → PixelMap → PNG 文件
+    const pixels: ImageData = ctx.getImageData(0, 0, width, height);
+    const options: image.InitializationOptions = {
+      size: { width: width, height: height },
+      pixelFormat: image.PixelMapFormat.RGBA_8888,
+      editable: false
+    };
+    try {
+      const buffer = pixels.data.buffer as ArrayBuffer;
+      const pixelMap: image.PixelMap = image.createPixelMapSync(buffer, options);
+      const path: string = `${context.filesDir}/share_card_${Date.now()}.png`;
+      const file: fs.File = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
+      const packer: image.ImagePacker = image.createImagePacker();
+      const packOptions: image.PackingOption = { format: 'image/png', quality: 95 };
+      packer.packToFile(pixelMap, file.fd, packOptions)
+        .then(() => {
+          fs.closeSync(file);
+          promptAction.showToast({ message: `分享卡已保存：${path}` });
+        })
+        .catch((err: Error) => {
+          fs.closeSync(file);
+          console.error(`shareCard pack failed: ${err.message}`);
+          promptAction.showToast({ message: '分享卡生成失败，请重试' });
+        });
+    } catch (err) {
+      console.error(`shareCard failed: ${JSON.stringify(err)}`);
+      promptAction.showToast({ message: '分享卡生成失败，请重试' });
+    }
+  }
+
   build() {
     Column() {
       // ===== 顶部栏 =====
@@ -506,6 +583,16 @@ struct ReportPage {
           .fontColor(this.theme.palette.primaryText)
           .margin({ left: 12 })
         Blank()
+        Button('分享卡')
+          .fontSize(13)
+          .fontColor(this.theme.palette.accent)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .borderRadius(16)
+          .height(32)
+          .accessibilityText('生成训练周报分享卡片图片')
+          .onClick(() => {
+            this.exportShareCard();
+          })
         ThemeToggle({ theme: this.theme })
       }
       .width('100%')

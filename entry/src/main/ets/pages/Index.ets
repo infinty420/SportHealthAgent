@@ -225,6 +225,11 @@ struct Index {
     this.engineV3.setConfig(config);
     this.applyInjuries();
     this.reloadProfile();
+    // 首次启动（画像未填写）→ 进入新手引导页
+    if (!this.profile.filled) {
+      router.replaceUrl({ url: 'pages/OnboardingPage' });
+      return;
+    }
     this.refreshHistory();
     this.loadWellness();
     this.refreshMesocycle();
@@ -952,23 +957,23 @@ struct Index {
       TabContent() {
         this.homeTab()
       }
-      .tabBar(this.tabBarItem(0, '🏠', '首页'))
+      .tabBar(this.tabBarItem(0, '🏠', $r('app.string.tab_home'), '首页'))
       TabContent() {
         this.trainTab()
       }
-      .tabBar(this.tabBarItem(1, '⚡', '训练'))
+      .tabBar(this.tabBarItem(1, '⚡', $r('app.string.tab_train'), '训练'))
       TabContent() {
         this.planTab()
       }
-      .tabBar(this.tabBarItem(2, '🗓', '计划'))
+      .tabBar(this.tabBarItem(2, '🗓', $r('app.string.tab_plan'), '计划'))
       TabContent() {
         ExerciseLibraryPage()
       }
-      .tabBar(this.tabBarItem(3, '🏋', '动作库'))
+      .tabBar(this.tabBarItem(3, '🏋', $r('app.string.tab_library'), '动作库'))
       TabContent() {
         HistoryCalendar({ refreshTick: this.discoverTick })
       }
-      .tabBar(this.tabBarItem(4, '🧭', '发现'))
+      .tabBar(this.tabBarItem(4, '🧭', $r('app.string.tab_discover'), '发现'))
     }
     .width('100%')
     .height('100%')
@@ -996,7 +1001,7 @@ struct Index {
 
   /** 底部导航项（参考快练：选中项浅灰胶囊底 + 加粗标签，未选中灰色） */
   @Builder
-  private tabBarItem(index: number, icon: string, label: string): void {
+  private tabBarItem(index: number, icon: string, label: string | Resource, a11y: string): void {
     Column({ space: 3 }) {
       Stack() {
         if (this.currentTab === index) {
@@ -1020,7 +1025,7 @@ struct Index {
     .width('100%')
     .height('100%')
     .justifyContent(FlexAlign.Center)
-    .accessibilityText(`${label}标签`)
+    .accessibilityText(`${a11y}标签`)
   }
 
   /** 首页 Tab：画像 / 每日状态 / 本周目标 / 今日营养 / 肌群热力 / 历史趋势 */
@@ -1030,11 +1035,11 @@ struct Index {
       // ===== 顶部栏：标题 + 报表入口 + 深色/浅色切换 =====
       Row() {
         Column({ space: 2 }) {
-          Text('衡练 · 运动健康 Agent')
+          Text($r('app.string.app_title'))
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.theme.palette.primaryText)
-          Text('端侧规则引擎 · 不联网 · 非医疗诊断')
+          Text($r('app.string.app_subtitle'))
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
         }
@@ -1882,6 +1887,7 @@ struct Index {
                 .selectedColor(this.theme.palette.accent)
                 .trackColor(this.theme.palette.track)
                 .blockColor(this.theme.palette.accent)
+                .accessibilityText('调整渐进超负荷加重步长')
                 .onChange((v: number) => {
                   this.weightStepKg = Math.round(v * 100) / 100;
                   this.applyRuleTable();
@@ -1909,6 +1915,7 @@ struct Index {
                   .borderRadius(8)
                   .padding({ left: 8, right: 8, top: 4, bottom: 4 })
                   .layoutWeight(1)
+                  .accessibilityText(`自定义${type}的互补训练类型`)
                   .onChange((v: string) => {
                     const drafts: string[] = this.complementaryDrafts.slice();
                     while (drafts.length < SPORT_TYPE_LIST.length) {
@@ -2106,6 +2113,7 @@ struct Index {
         .selectedColor(this.theme.palette.accent)
         .trackColor(this.theme.palette.track)
         .blockColor(this.theme.palette.accent)
+        .accessibilityText($$.label)
         .onChange((v: number) => {
           $$.onSlide(Math.round(v));
         })
