@@ -1363,7 +1363,7 @@ struct Index {
               Canvas(this.mesoCtx)
                 .width('100%')
                 .height(150)
-                .key(this.mesoCanvasKey)
+                .key(`${this.mesoCanvasKey}-${this.theme.mode}`)
                 .accessibilityText('本中周期容量与强度趋势图')
                 .onReady(() => {
                   this.drawMesocycle();
@@ -1444,7 +1444,7 @@ struct Index {
                 Canvas(this.heatCtx)
                   .width('100%')
                   .height(190)
-                  .key(this.heatCanvasKey)
+                  .key(`${this.heatCanvasKey}-${this.theme.mode}`)
                   .accessibilityText('本周肌群容量热力图')
                   .onReady(() => {
                     this.drawMuscleHeat();
@@ -1552,7 +1552,8 @@ struct Index {
                 Canvas(this.trendCtx)
                   .width('100%')
                   .height(90)
-                  .key(this.trendCanvasKey)
+                  .key(`${this.trendCanvasKey}-${this.theme.mode}`)
+                  .accessibilityText('每周平均负荷趋势线')
                   .onReady(() => {
                     this.drawWeeklyAverageLine();
                   })

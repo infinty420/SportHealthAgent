@@ -203,6 +203,7 @@ struct WhatIfPage {
             Canvas(this.chartCtx)
               .width('100%')
               .height(180)
+              .key(`whatif-${this.theme.mode}`)
               .accessibilityText('体重趋势模拟折线图')
               .onReady(() => {
                 this.drawChart();

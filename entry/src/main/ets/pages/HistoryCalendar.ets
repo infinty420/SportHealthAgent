@@ -859,7 +859,7 @@ export struct HistoryCalendar {
                 Canvas(this.heatCtx)
                   .width('100%')
                   .height(190)
-                  .key(this.heatCanvasKey)
+                  .key(`${this.heatCanvasKey}-${this.theme.mode}`)
                   .accessibilityText('部位热力图，点击部位查看统计')
                   .onReady(() => {
                     this.drawHeat();
@@ -935,7 +935,7 @@ export struct HistoryCalendar {
                 Canvas(this.donutCtx)
                   .width(200)
                   .height(200)
-                  .key(this.donutCanvasKey)
+                  .key(`${this.donutCanvasKey}-${this.theme.mode}`)
                   .accessibilityText('部位组数分布环形图')
                   .onReady(() => {
                     this.drawDonut();
@@ -966,7 +966,7 @@ export struct HistoryCalendar {
               Canvas(this.durCtx)
                 .width('100%')
                 .height(150)
-                .key(this.durCanvasKey)
+                .key(`${this.durCanvasKey}-${this.theme.mode}`)
                 .accessibilityText('训练时长周期对比')
                 .onReady(() => {
                   this.drawDuration();
