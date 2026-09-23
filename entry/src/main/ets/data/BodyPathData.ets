@@ -8,32 +8,32 @@
  */
 
 export class BodyPathData {
-  /** 正面色斑：肩/胸/腹/臀/手臂/腿 */
+  /** 正面色斑：肩/胸/腹/臀/手臂/腿（已按 AI 真人肌肉底图校准） */
   static getFrontSpots(): Map<string, number[]> {
     const spots: Map<string, number[]> = new Map<string, number[]>();
-    spots.set('肩左', [22, 15, 12]);
-    spots.set('肩右', [78, 15, 12]);
-    spots.set('胸', [50, 28, 17]);
-    spots.set('腹', [50, 46, 13]);
-    spots.set('臀', [50, 62, 15]);
-    spots.set('手臂左', [8, 36, 10]);
-    spots.set('手臂右', [92, 36, 10]);
-    spots.set('腿左', [42, 83, 13]);
-    spots.set('腿右', [58, 83, 13]);
+    spots.set('肩左', [25, 19, 12]);
+    spots.set('肩右', [75, 19, 12]);
+    spots.set('胸', [50, 21, 15]);
+    spots.set('腹', [50, 33, 12]);
+    spots.set('臀', [50, 46, 13]);
+    spots.set('手臂左', [17, 37, 10]);
+    spots.set('手臂右', [83, 37, 10]);
+    spots.set('腿左', [40, 60, 13]);
+    spots.set('腿右', [60, 60, 13]);
     return spots;
   }
 
-  /** 背面色斑：肩/背/臀/手臂/腿 */
+  /** 背面色斑：肩/背/臀/手臂/腿（已按 AI 真人肌肉底图校准） */
   static getBackSpots(): Map<string, number[]> {
     const spots: Map<string, number[]> = new Map<string, number[]>();
-    spots.set('肩左', [22, 15, 12]);
-    spots.set('肩右', [78, 15, 12]);
-    spots.set('背', [50, 34, 18]);
-    spots.set('臀', [50, 62, 15]);
-    spots.set('手臂左', [8, 36, 10]);
-    spots.set('手臂右', [92, 36, 10]);
-    spots.set('腿左', [42, 83, 13]);
-    spots.set('腿右', [58, 83, 13]);
+    spots.set('肩左', [26, 18, 12]);
+    spots.set('肩右', [74, 18, 12]);
+    spots.set('背', [50, 31, 17]);
+    spots.set('臀', [50, 47, 14]);
+    spots.set('手臂左', [17, 36, 10]);
+    spots.set('手臂右', [83, 36, 10]);
+    spots.set('腿左', [42, 60, 13]);
+    spots.set('腿右', [58, 60, 13]);
     return spots;
   }
 
