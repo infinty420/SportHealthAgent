@@ -29,6 +29,8 @@ import { WorkoutLogStore } from '../data/WorkoutLogStore';
 import { WorkoutLog } from '../model/WorkoutLog';
 import { InjuryStore } from '../data/InjuryStore';
 import { WellnessLogStore, WellnessEntry } from '../data/WellnessLogStore';
+import { WaterLog } from '../data/WaterLog';
+import { DietPlanner, DailyCaloriePlan } from '../agent/rules/DietPlanner';
 import { FatigueModel, FatigueResult } from '../agent/rules/FatigueModel';
 import { ReadinessScorer, ReadinessInput, ReadinessReport } from '../agent/rules/ReadinessScorer';
 import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/MuscleBalanceAnalyzer';
@@ -91,6 +93,7 @@ struct Index {
   private workoutStore: WorkoutLogStore | null = null;
   private injuryStore: InjuryStore | null = null;
   private wellnessStore: WellnessLogStore | null = null;
+  private waterLog: WaterLog | null = null;
 
   // 每日状态录入（睡眠/酸痛/饮水）与准备度
   @State sleepHoursText: string = '7';
@@ -102,6 +105,13 @@ struct Index {
   @State readinessFatigue: number = 0;
   @State readinessHours: number = -1;
   private readonly rateOptions: string[] = ['1', '2', '3', '4', '5'];
+
+  // 饮水达成环与餐时机（2.1–2.3：WaterLog 驱动；训练日目标 +500ml、碳水 55%/40% 周期化）
+  @State waterMl: number = 0;
+  @State waterGoal: number = 2000;
+  @State isTrainingDay: boolean = false;
+  @State timingLines: string[] = [];
+  @State carbLine: string = '';
 
   // 本中周期进度（MesocyclePlanner 输出 + Canvas 双折线）
   @State mesoPlan: MesocyclePlan | null = null;
@@ -178,6 +188,7 @@ struct Index {
     this.workoutStore = new WorkoutLogStore(context);
     this.injuryStore = new InjuryStore(context);
     this.wellnessStore = new WellnessLogStore(context);
+    this.waterLog = new WaterLog(context);
     const config: RuleConfig = this.settingsStore.load();
     this.highThreshold = config.highThreshold;
     this.normalThreshold = config.normalThreshold;
@@ -190,6 +201,8 @@ struct Index {
     this.refreshHistory();
     this.loadWellness();
     this.refreshMesocycle();
+    this.refreshWater();
+    this.refreshMealTiming();
   }
 
   /** 从子页面返回时：重载画像、伤病、今日营养与肌群热力 */
@@ -199,6 +212,8 @@ struct Index {
     this.refreshIntake();
     this.refreshMuscleHeat();
     this.refreshMesocycle();
+    this.refreshWater();
+    this.refreshMealTiming();
   }
 
   /** 读取当前伤病部位并注入两个引擎（影响计划生成与补强推荐的禁忌过滤） */
@@ -247,7 +262,12 @@ struct Index {
       waterMl: Number(this.waterText) > 0 ? Number(this.waterText) : 0
     };
     this.wellnessStore.save(entry);
+    // 水量字段同步到 WaterLog（首页饮水达成环的数据源）
+    if (this.waterLog !== null && entry.waterMl > 0) {
+      this.waterLog.setMl(entry.waterMl);
+    }
     this.refreshReadiness();
+    this.refreshWater();
     promptAction.showToast({ message: '今日状态已保存' });
   }
 
@@ -337,6 +357,56 @@ struct Index {
     const elapsed: number = Math.floor((Date.now() - start) / 604800000);
     this.mesoWeek = Math.min(plan.lengthWeeks, Math.max(1, 1 + elapsed));
     this.mesoCanvasKey = `meso-${this.mesoWeek}-${fatigue.index}`;
+  }
+
+  /** 今日是否训练日（历史记录中含今天的训练条目） */
+  private trainedToday(): boolean {
+    const today: string = WellnessLogStore.todayKey();
+    for (let i: number = 0; i < this.history.length; i++) {
+      const d: Date = new Date(this.history[i].timestamp);
+      const key: string = `${d.getFullYear()}-${`${d.getMonth() + 1}`.padStart(2, '0')}-` +
+        `${`${d.getDate()}`.padStart(2, '0')}`;
+      if (key === today) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** 刷新饮水达成环（目标 35ml/kg，训练日 +500ml） */
+  private refreshWater(): void {
+    if (this.waterLog === null) {
+      return;
+    }
+    this.isTrainingDay = this.trainedToday();
+    this.waterMl = this.waterLog.todayMl();
+    const weight: number = this.profile.weightKg > 0 ? this.profile.weightKg : 65;
+    this.waterGoal = WaterLog.goalMl(weight, this.isTrainingDay);
+  }
+
+  /** 快捷补水（+250/+500ml），写入 WaterLog 并刷新达成环 */
+  private addWater(ml: number): void {
+    if (this.waterLog === null) {
+      return;
+    }
+    this.waterMl = this.waterLog.addMl(ml);
+    promptAction.showToast({ message: `已记录饮水 ${this.waterMl} ml` });
+  }
+
+  /** 刷新餐时机时间轴与碳水循环方案（画像已填时按 TDEE 计算） */
+  private refreshMealTiming(): void {
+    if (!this.profile.filled) {
+      this.timingLines = [];
+      this.carbLine = '';
+      return;
+    }
+    const daily: DailyCaloriePlan = DietPlanner.dailyPlan(this.profile.gender, this.profile.weightKg,
+      this.profile.heightCm, this.profile.age, this.profile.goal);
+    this.timingLines = DietPlanner.mealTiming(this.isTrainingDay);
+    const trainingCarb: number = DietPlanner.cyclingCarbGrams(daily.targetKcal, true);
+    const restCarb: number = DietPlanner.cyclingCarbGrams(daily.targetKcal, false);
+    this.carbLine = `碳水循环：训练日 55%（${trainingCarb}g）/ 非训练日 40%（${restCarb}g）· ` +
+      `今日按${this.isTrainingDay ? '训练日' : '非训练日'}执行`;
   }
 
   /** 中周期双折线：容量%（强调色）+ 强度%（成功色），减载周警告色圆点，已完成周实色、未来周半透明 */
@@ -1087,6 +1157,55 @@ struct Index {
             if (this.readiness !== null) {
               this.readinessLine(this.readiness)
             }
+            // 饮水达成环（WaterLog 驱动；训练日目标 +500ml）
+            Row({ space: 14 }) {
+              Stack() {
+                Progress({
+                  value: Math.min(this.waterMl, this.waterGoal),
+                  total: this.waterGoal,
+                  type: ProgressType.Ring
+                })
+                  .width(56)
+                  .height(56)
+                  .color(this.theme.palette.accent)
+                  .backgroundColor(this.theme.palette.track)
+                Text(`${Math.round(Math.min(this.waterMl, this.waterGoal) / this.waterGoal * 100)}%`)
+                  .fontSize(11)
+                  .fontColor(this.theme.palette.primaryText)
+              }
+              .accessibilityText(`今日饮水 ${this.waterMl} 毫升，目标 ${this.waterGoal} 毫升`)
+              Column({ space: 4 }) {
+                Text(`饮水 ${this.waterMl} / ${this.waterGoal} ml${this.isTrainingDay ? '（训练日 +500）' : ''}`)
+                  .fontSize(13)
+                  .fontColor(this.theme.palette.primaryText)
+                Row({ space: 8 }) {
+                  Button('+250ml')
+                    .fontSize(12)
+                    .fontColor(this.theme.palette.accent)
+                    .backgroundColor(this.theme.palette.inputBackground)
+                    .borderRadius(14)
+                    .height(28)
+                    .accessibilityText('记录饮水 250 毫升')
+                    .onClick(() => {
+                      this.addWater(250);
+                    })
+                  Button('+500ml')
+                    .fontSize(12)
+                    .fontColor(this.theme.palette.accent)
+                    .backgroundColor(this.theme.palette.inputBackground)
+                    .borderRadius(14)
+                    .height(28)
+                    .accessibilityText('记录饮水 500 毫升')
+                    .onClick(() => {
+                      this.addWater(500);
+                    })
+                }
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+            }
+            .width('100%')
+            .margin({ top: 10 })
           }
 
           // ===== 本周目标进度环 =====
@@ -1159,6 +1278,40 @@ struct Index {
 
           // ===== 今日营养达成环（完成一次分析后出现） =====
           this.intakeCard(this.intake)
+
+          // ===== 训练前后餐时机时间轴卡（2.2/2.3：画像已填时按训练日/非训练日切换） =====
+          if (this.timingLines.length > 0) {
+            SectionCard({ theme: this.theme, title: '餐时机与碳水循环' }) {
+              ForEach(this.timingLines, (line: string, idx: number) => {
+                Row({ space: 10 }) {
+                  Column() {
+                    Circle({ width: 8, height: 8 })
+                      .fill(this.theme.palette.accent)
+                    Row()
+                      .width(2)
+                      .layoutWeight(1)
+                      .backgroundColor(idx === this.timingLines.length - 1 ?
+                        this.theme.palette.cardBackground : this.theme.palette.track)
+                  }
+                  .width(8)
+                  .alignItems(HorizontalAlign.Center)
+                  Text(line)
+                    .fontSize(12)
+                    .fontColor(this.theme.palette.primaryText)
+                    .lineHeight(18)
+                    .layoutWeight(1)
+                }
+                .width('100%')
+                .alignItems(VerticalAlign.Top)
+                .margin({ bottom: 6 })
+              }, (line: string) => line)
+              Text(this.carbLine)
+                .fontSize(12)
+                .fontColor(this.theme.palette.accent)
+                .lineHeight(17)
+                .margin({ top: 4 })
+            }
+          }
 
           // ===== 本周肌群容量热力（训练日志驱动，Canvas 人体色块） =====
           SectionCard({ theme: this.theme, title: '本周肌群容量热力' }) {
@@ -1355,6 +1508,20 @@ struct Index {
                       this.historyStore.clear();
                       this.refreshHistory();
                     }
+                  })
+                Button('备份恢复')
+                  .fontSize(13)
+                  .fontColor(this.theme.palette.accent)
+                  .backgroundColor(this.theme.palette.inputBackground)
+                  .borderRadius(16)
+                  .height(32)
+                  .layoutWeight(1)
+                  .accessibilityText('打开数据备份与恢复页')
+                  .onClick(() => {
+                    router.pushUrl({ url: 'pages/BackupPage' })
+                      .catch((err: Error) => {
+                        console.error(`openBackup failed: ${err.message}`);
+                      });
                   })
               }
               .width('100%')

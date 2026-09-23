@@ -42,6 +42,12 @@ struct WorkoutLogPage {
   @State private selected: ExerciseItem | null = null;
   @State private setRows: SetRow[] = [new SetRow(), new SetRow(), new SetRow()];
   @State private suggestion: OverloadSuggestion | null = null;
+  // 组间休息计时器（纯 UI setInterval，到点变色闪烁提醒，不调用震动等系统能力）
+  @State private restLeft: number = 0;
+  @State private restRunning: boolean = false;
+  @State private restFlash: boolean = false;
+  private restTimer: number = -1;
+  private flashTimer: number = -1;
   private readonly equipments: string[] = ['全部'].concat(EXERCISE_EQUIPMENTS);
   private readonly muscles: string[] = ['全部'].concat(EXERCISE_MUSCLES);
   private readonly rpeOptions: string[] = WorkoutLogPage.buildRpeOptions();
@@ -58,6 +64,76 @@ struct WorkoutLogPage {
   aboutToAppear(): void {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
     this.store = new WorkoutLogStore(context);
+  }
+
+  /** 页面销毁前清理计时器，避免泄漏 */
+  aboutToDisappear(): void {
+    this.clearRestTimers();
+  }
+
+  /** 按动作类型建议休息秒数：复合动作（杠铃/史密斯/自重多关节）150–180s，孤立动作 60–90s */
+  private suggestedRest(): number {
+    if (this.selected === null) {
+      return 90;
+    }
+    const equipment: string = this.selected.equipment;
+    if (equipment === '杠铃' || equipment === '史密斯' || this.selected.muscle === '腿' ||
+      this.selected.muscle === '背') {
+      return 165;
+    }
+    return 75;
+  }
+
+  private clearRestTimers(): void {
+    if (this.restTimer >= 0) {
+      clearInterval(this.restTimer);
+      this.restTimer = -1;
+    }
+    if (this.flashTimer >= 0) {
+      clearInterval(this.flashTimer);
+      this.flashTimer = -1;
+    }
+  }
+
+  /** 启动倒计时；到点后变色闪烁约 5 秒提示可以开始下一组 */
+  private startRest(seconds: number): void {
+    this.clearRestTimers();
+    this.restLeft = seconds;
+    this.restRunning = true;
+    this.restFlash = false;
+    this.restTimer = setInterval(() => {
+      this.restLeft--;
+      if (this.restLeft <= 0) {
+        this.restLeft = 0;
+        this.restRunning = false;
+        clearInterval(this.restTimer);
+        this.restTimer = -1;
+        let ticks: number = 0;
+        this.flashTimer = setInterval(() => {
+          this.restFlash = !this.restFlash;
+          ticks++;
+          if (ticks >= 12) {
+            this.restFlash = false;
+            clearInterval(this.flashTimer);
+            this.flashTimer = -1;
+          }
+        }, 400);
+      }
+    }, 1000);
+  }
+
+  private stopRest(): void {
+    this.clearRestTimers();
+    this.restLeft = 0;
+    this.restRunning = false;
+    this.restFlash = false;
+  }
+
+  /** 倒计时显示文本（mm:ss） */
+  private restText(): string {
+    const min: number = Math.floor(this.restLeft / 60);
+    const sec: string = `${this.restLeft % 60}`.padStart(2, '0');
+    return `${min}:${sec}`;
   }
 
   private applyFilter(): void {
@@ -331,6 +407,71 @@ struct WorkoutLogPage {
             }
             .width('100%')
             .margin({ top: 14 })
+          }
+
+          // ===== 组间休息计时器（建议：复合 150–180s / 孤立 60–90s；到点变色闪烁） =====
+          SectionCard({ theme: this.theme, title: '组间休息' }) {
+            Row({ space: 14 }) {
+              Text(this.restText())
+                .fontSize(30)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(this.restFlash ? this.theme.palette.onAccent :
+                  (this.restLeft <= 10 && this.restRunning ? this.theme.palette.warning :
+                    this.theme.palette.primaryText))
+                .padding({ left: 14, right: 14, top: 4, bottom: 4 })
+                .borderRadius(12)
+                .backgroundColor(this.restFlash ? this.theme.palette.danger :
+                  this.theme.palette.cardBackground)
+                .accessibilityText(`休息倒计时 ${this.restText()}`)
+              Column({ space: 6 }) {
+                Text(this.restRunning ? '休息中…' :
+                  (this.restFlash ? '时间到，开始下一组！' :
+                    `建议 ${this.suggestedRest()}s（${this.suggestedRest() >= 150 ? '复合动作 150–180s' : '孤立动作 60–90s'}）`))
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.secondaryText)
+                Row({ space: 8 }) {
+                  Button(this.restRunning ? '停止' : `开始 ${this.suggestedRest()}s`)
+                    .fontSize(12)
+                    .fontColor(this.theme.palette.onAccent)
+                    .backgroundColor(this.restRunning ? this.theme.palette.danger : this.theme.palette.accent)
+                    .borderRadius(14)
+                    .height(30)
+                    .accessibilityText(this.restRunning ? '停止休息计时' : '按建议时长开始休息计时')
+                    .onClick(() => {
+                      if (this.restRunning) {
+                        this.stopRest();
+                      } else {
+                        this.startRest(this.suggestedRest());
+                      }
+                    })
+                  if (!this.restRunning) {
+                    Button('90s')
+                      .fontSize(12)
+                      .fontColor(this.theme.palette.accent)
+                      .backgroundColor(this.theme.palette.inputBackground)
+                      .borderRadius(14)
+                      .height(30)
+                      .accessibilityText('开始 90 秒休息计时')
+                      .onClick(() => {
+                        this.startRest(90);
+                      })
+                    Button('180s')
+                      .fontSize(12)
+                      .fontColor(this.theme.palette.accent)
+                      .backgroundColor(this.theme.palette.inputBackground)
+                      .borderRadius(14)
+                      .height(30)
+                      .accessibilityText('开始 180 秒休息计时')
+                      .onClick(() => {
+                        this.startRest(180);
+                      })
+                  }
+                }
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+            }
+            .width('100%')
           }
         }
         .padding({ left: 16, right: 16, bottom: 24 })

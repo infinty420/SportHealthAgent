@@ -6,6 +6,7 @@
     "pages/Report",
     "pages/ProfilePage",
     "pages/WorkoutLogPage",
-    "pages/WhatIfPage"
+    "pages/WhatIfPage",
+    "pages/BackupPage"
   ]
 }

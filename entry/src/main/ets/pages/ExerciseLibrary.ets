@@ -20,15 +20,31 @@ export struct ExerciseLibraryPage {
   @State theme: ThemeManager = ThemeManager.instance;
   @State selectedEquipment: string = '全部';
   @State selectedMuscle: string = '全部';
+  @State keyword: string = '';
+  @State selectedDifficulty: string = '全部';
   @State shownList: ExerciseItem[] = ExerciseLibrary.all();
 
   /** 器械筛选项（「全部」+ 6 类器械；成员变量供 ForEach 直接使用） */
   private readonly equipments: string[] = ['全部'].concat(EXERCISE_EQUIPMENTS);
   /** 部位筛选项（「全部」+ 8 个部位；成员变量供 ForEach 直接使用） */
   private readonly muscles: string[] = ['全部'].concat(EXERCISE_MUSCLES);
+  /** 难度筛选项（2.6 多条件检索：纯数组 filter，无搜索引擎） */
+  private readonly difficulties: string[] = ['全部', '初级', '中级', '高级'];
 
+  /** 多条件过滤：器械 × 部位 × 名称关键词 × 难度（先算好赋值给 shownList，ForEach 不直接调方法） */
   private applyFilter(): void {
-    this.shownList = ExerciseLibrary.filter(this.selectedEquipment, this.selectedMuscle);
+    const base: ExerciseItem[] = ExerciseLibrary.filter(this.selectedEquipment, this.selectedMuscle);
+    const kw: string = this.keyword.trim();
+    this.shownList = base.filter((item: ExerciseItem) => {
+      if (this.selectedDifficulty !== '全部' && item.difficulty !== this.selectedDifficulty) {
+        return false;
+      }
+      if (kw.length > 0 && item.name.indexOf(kw) < 0 && item.subMuscle.indexOf(kw) < 0 &&
+        item.targetMuscles.indexOf(kw) < 0) {
+        return false;
+      }
+      return true;
+    });
   }
 
   private selectEquipment(equipment: string): void {
@@ -63,6 +79,40 @@ export struct ExerciseLibraryPage {
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+
+      // ===== 搜索栏 + 难度筛选（2.6：名称/肌群/器械/难度多条件检索） =====
+      Row({ space: 8 }) {
+        TextInput({ placeholder: '搜索动作名 / 细分部位 / 目标肌群', text: this.keyword })
+          .fontColor(this.theme.palette.primaryText)
+          .placeholderColor(this.theme.palette.secondaryText)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .borderRadius(16)
+          .height(36)
+          .layoutWeight(1)
+          .accessibilityText('搜索动作库')
+          .onChange((v: string) => {
+            this.keyword = v;
+            this.applyFilter();
+          })
+        ForEach(this.difficulties, (diff: string) => {
+          Text(diff)
+            .fontSize(12)
+            .fontColor(this.selectedDifficulty === diff ?
+              this.theme.palette.onAccent : this.theme.palette.primaryText)
+            .textAlign(TextAlign.Center)
+            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+            .borderRadius(13)
+            .backgroundColor(this.selectedDifficulty === diff ?
+              this.theme.palette.accent : this.theme.palette.inputBackground)
+            .accessibilityText(`按难度 ${diff} 筛选`)
+            .onClick(() => {
+              this.selectedDifficulty = diff;
+              this.applyFilter();
+            })
+        }, (diff: string) => diff)
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, bottom: 8 })
 
       // ===== 顶部器械筛选条（杠铃 / 哑铃 / 史密斯 / 绳索 / 自重 / 弹力带） =====
       Scroll() {

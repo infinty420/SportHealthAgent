@@ -105,6 +105,33 @@ export class DietPlanner {
   }
 
   /**
+   * 周期化饮食（cycling carbs）：按当日是否训练日切换碳水占比。
+   * 训练日碳水占总热量 55%，非训练日 40%；返回碳水克数。
+   */
+  static cyclingCarbGrams(targetKcal: number, isTrainingDay: boolean): number {
+    const pct: number = isTrainingDay ? 0.55 : 0.40;
+    return Math.round(targetKcal * pct / KCAL_PER_G_CARB);
+  }
+
+  /**
+   * 训练前后餐时机时间轴（纯规则文案，首页时间轴卡展示）。
+   * 训练日强调训前碳水与训后 30 分钟恢复窗口；非训练日提示碳水下调。
+   */
+  static mealTiming(isTrainingDay: boolean): string[] {
+    const tips: string[] = [];
+    if (isTrainingDay) {
+      tips.push('训练前 1–2 小时：碳水为主的正餐（约占当日碳水 25%–30%），低脂低纤维避免肠胃负担');
+      tips.push('训练后 30 分钟内：蛋白质约 30g + 碳水约 40g 的恢复窗口，优先快吸收食材');
+      tips.push('其余餐次：蛋白质均摊每餐 20–40g，睡前可补缓释蛋白');
+    } else {
+      tips.push('非训练日：碳水占比按 40% 执行，蛋白质保持不变');
+      tips.push('正餐以蛋白质 + 蔬菜为主，碳水集中在早餐与午餐');
+      tips.push('晚间减少精制碳水，避免热量盈余转化为脂肪');
+    }
+    return tips;
+  }
+
+  /**
    * 每日热量与双碳水方案。
    * 目标修正：增肌 +300 / 减脂 −500 / 维持 0；非训练日碳水较训练日下调 50g（−200 kcal）。
    */
