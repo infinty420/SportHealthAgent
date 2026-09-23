@@ -5,6 +5,7 @@
     "pages/FoodPicker",
     "pages/Report",
     "pages/ProfilePage",
-    "pages/WorkoutLogPage"
+    "pages/WorkoutLogPage",
+    "pages/WhatIfPage"
   ]
 }

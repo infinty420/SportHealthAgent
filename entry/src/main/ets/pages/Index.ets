@@ -32,6 +32,7 @@ import { WellnessLogStore, WellnessEntry } from '../data/WellnessLogStore';
 import { FatigueModel, FatigueResult } from '../agent/rules/FatigueModel';
 import { ReadinessScorer, ReadinessInput, ReadinessReport } from '../agent/rules/ReadinessScorer';
 import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/MuscleBalanceAnalyzer';
+import { MesocyclePlanner, MesocyclePlan, MesocycleWeek } from '../agent/rules/MesocyclePlanner';
 import { StrengthCalculator } from '../agent/rules/StrengthCalculator';
 import { HEAT_MUSCLE_GROUPS } from '../agent/rules/TrainingStatsAggregator';
 import { HeatColorUtil } from '../utils/HeatColorUtil';
@@ -57,6 +58,11 @@ interface SliderSpec {
 /** 分析结果 @Builder 按引用传参类型 */
 interface ReportRef {
   report: AnalysisReport;
+}
+
+/** 准备度卡 @Builder 按引用传参类型（保持 @State 响应式绑定） */
+interface ReadinessRef {
+  report: ReadinessReport;
 }
 
 /** 食物卡片行 @Builder 按引用传参类型 */
@@ -92,7 +98,16 @@ struct Index {
   @State soreness: number = 2;
   @State waterText: string = '1500';
   @State readiness: ReadinessReport | null = null;
+  /** 准备度参与因子（首页卡展示）：疲劳指数 / 距上次训练小时数 */
+  @State readinessFatigue: number = 0;
+  @State readinessHours: number = -1;
   private readonly rateOptions: string[] = ['1', '2', '3', '4', '5'];
+
+  // 本中周期进度（MesocyclePlanner 输出 + Canvas 双折线）
+  @State mesoPlan: MesocyclePlan | null = null;
+  @State mesoWeek: number = 1;
+  @State mesoCanvasKey: string = 'meso-0';
+  private mesoCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
 
   // 本周肌群容量热力（按部位有效组数；Canvas 人体色块直读）
   @State heatChest: number = 0;
@@ -174,6 +189,7 @@ struct Index {
     this.reloadProfile();
     this.refreshHistory();
     this.loadWellness();
+    this.refreshMesocycle();
   }
 
   /** 从子页面返回时：重载画像、伤病、今日营养与肌群热力 */
@@ -182,6 +198,7 @@ struct Index {
     this.applyInjuries();
     this.refreshIntake();
     this.refreshMuscleHeat();
+    this.refreshMesocycle();
   }
 
   /** 读取当前伤病部位并注入两个引擎（影响计划生成与补强推荐的禁忌过滤） */
@@ -259,6 +276,151 @@ struct Index {
       consecutiveTrainingDays: this.consecutiveTrainingDays()
     };
     this.readiness = ReadinessScorer.score(input);
+    this.readinessFatigue = fatigue.index;
+    this.readinessHours = hoursSince;
+  }
+
+  /** 强度档 → 颜色（准备度环形与数字着色：高=成功/中=强调/低=警告/休息=危险） */
+  private tierColor(tier: string): string {
+    if (tier === '高') {
+      return this.theme.palette.success;
+    }
+    if (tier === '中') {
+      return this.theme.palette.accent;
+    }
+    if (tier === '低') {
+      return this.theme.palette.warning;
+    }
+    return this.theme.palette.danger;
+  }
+
+  /** 过度训练预警命中条件列表（徽章点击弹窗展示；阈值与 ReadinessScorer 一致） */
+  private overtrainingHits(): string[] {
+    const hits: string[] = [];
+    if (this.readinessFatigue >= 70) {
+      hits.push(`疲劳指数 ${this.readinessFatigue} ≥ 70`);
+    }
+    if (this.readiness !== null && this.readiness.score < 40) {
+      hits.push(`准备度 ${this.readiness.score} < 40`);
+    }
+    const streak: number = this.consecutiveTrainingDays();
+    if (streak >= 6) {
+      hits.push(`连续训练 ${streak} 天 ≥ 6 天`);
+    }
+    if (hits.length === 0) {
+      hits.push('当前无命中条件');
+    }
+    return hits;
+  }
+
+  /** 过度训练预警徽章颜色：黄=警告，橙=危险 70% 透明，红=危险 */
+  private overtrainingColor(level: string): string {
+    if (level === '黄') {
+      return this.theme.palette.warning;
+    }
+    return this.theme.palette.danger;
+  }
+
+  /** 刷新本中周期计划（疲劳指数驱动；首次展示时记录周期起点用于推算当前周次） */
+  private refreshMesocycle(): void {
+    if (this.settingsStore === null) {
+      return;
+    }
+    let start: number = this.settingsStore.cycleStart();
+    if (start <= 0) {
+      start = Date.now();
+      this.settingsStore.saveCycleStart(start);
+    }
+    const fatigue: FatigueResult = FatigueModel.compute(this.history);
+    const plan: MesocyclePlan = MesocyclePlanner.plan(6, fatigue.index, false);
+    this.mesoPlan = plan;
+    const elapsed: number = Math.floor((Date.now() - start) / 604800000);
+    this.mesoWeek = Math.min(plan.lengthWeeks, Math.max(1, 1 + elapsed));
+    this.mesoCanvasKey = `meso-${this.mesoWeek}-${fatigue.index}`;
+  }
+
+  /** 中周期双折线：容量%（强调色）+ 强度%（成功色），减载周警告色圆点，已完成周实色、未来周半透明 */
+  private drawMesocycle(): void {
+    const ctx: CanvasRenderingContext2D = this.mesoCtx;
+    ctx.clearRect(0, 0, 320, 150);
+    if (this.mesoPlan === null) {
+      return;
+    }
+    const weeks: MesocycleWeek[] = this.mesoPlan.weeks;
+    const n: number = weeks.length;
+    if (n === 0) {
+      return;
+    }
+    const left: number = 12;
+    const top: number = 10;
+    const w: number = 296;
+    const h: number = 108;
+    const step: number = n > 1 ? w / (n - 1) : 0;
+    // 坐标映射：百分比 50–130 → 画布纵轴
+    const yOf = (pct: number): number => {
+      const clamped: number = Math.max(50, Math.min(130, pct));
+      return top + h - (clamped - 50) / 80 * h;
+    };
+    const xOf = (i: number): number => left + i * step;
+    // 轴线
+    ctx.strokeStyle = this.theme.palette.track;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, top);
+    ctx.lineTo(left, top + h);
+    ctx.lineTo(left + w, top + h);
+    ctx.stroke();
+    // 折线分段绘制：已完成周（i+1 <= mesoWeek）实色，未来周半透明
+    const drawLine = (pick: (wk: MesocycleWeek) => number, color: string): void => {
+      for (let seg: number = 0; seg < 2; seg++) {
+        const future: boolean = seg === 1;
+        ctx.strokeStyle = HeatColorUtil.alphaColor(color, future ? 0.4 : 1);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        let started: boolean = false;
+        for (let i: number = 0; i < n; i++) {
+          const inFuture: boolean = i + 1 > this.mesoWeek;
+          if (inFuture !== future) {
+            continue;
+          }
+          const x: number = xOf(i);
+          const y: number = yOf(pick(weeks[i]));
+          if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+          } else {
+            ctx.lineTo(x, y);
+          }
+        }
+        ctx.stroke();
+      }
+    };
+    drawLine((wk: MesocycleWeek): number => wk.volumePct, this.theme.palette.accent);
+    drawLine((wk: MesocycleWeek): number => wk.intensityPct, this.theme.palette.success);
+    // 周点与标签：减载周警告色大点 + D 标记，普通周小点
+    ctx.textAlign = 'center';
+    for (let i: number = 0; i < n; i++) {
+      const wk: MesocycleWeek = weeks[i];
+      const x: number = xOf(i);
+      const future: boolean = i + 1 > this.mesoWeek;
+      const dotColor: string = wk.isDeload ? this.theme.palette.warning : this.theme.palette.accent;
+      ctx.fillStyle = HeatColorUtil.alphaColor(dotColor, future ? 0.4 : 1);
+      ctx.beginPath();
+      ctx.arc(x, yOf(wk.volumePct), wk.isDeload ? 4 : 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = HeatColorUtil.alphaColor(this.theme.palette.secondaryText, future ? 0.5 : 1);
+      ctx.font = this.canvasFont(9, false);
+      ctx.fillText(wk.isDeload ? `W${wk.weekIndex}减` : `W${wk.weekIndex}`, x, top + h + 14);
+    }
+    // 图例
+    ctx.textAlign = 'left';
+    ctx.font = this.canvasFont(9, false);
+    ctx.fillStyle = this.theme.palette.accent;
+    ctx.fillText('— 容量%', left + 4, top + 8);
+    ctx.fillStyle = this.theme.palette.success;
+    ctx.fillText('— 强度%', left + 62, top + 8);
+    ctx.fillStyle = this.theme.palette.warning;
+    ctx.fillText('● 减载周', left + 122, top + 8);
   }
 
   /** 连续训练天数（今天未训练时从昨天往前数） */
@@ -810,6 +972,17 @@ struct Index {
           .shadow({ radius: 14, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 4 })
           .margin({ bottom: 14 })
 
+          // ===== 今日准备度卡：环形进度（档位四色映射）+ 参与因子 + 过度训练三级预警徽章 =====
+          if (this.readiness !== null) {
+            this.readinessCard({ report: this.readiness })
+          } else {
+            SectionCard({ theme: this.theme, title: '今日准备度' }) {
+              Text('保存一次「每日状态」后，这里显示今日准备度与强度建议')
+                .fontSize(13)
+                .fontColor(this.theme.palette.secondaryText)
+            }
+          }
+
           // ===== 快速操作：记训练 / 记一餐 / 画像 / 报表 =====
           Row({ space: 10 }) {
             this.quickAction('📝', '记训练', () => {
@@ -837,6 +1010,12 @@ struct Index {
               router.pushUrl({ url: 'pages/Report' })
                 .catch((err: Error) => {
                   console.error(`openReport failed: ${err.message}`);
+                });
+            })
+            this.quickAction('🧪', '模拟', () => {
+              router.pushUrl({ url: 'pages/WhatIfPage' })
+                .catch((err: Error) => {
+                  console.error(`openWhatIf failed: ${err.message}`);
                 });
             })
           }
@@ -947,6 +1126,35 @@ struct Index {
             }
             .width('100%')
             .margin({ top: 8 })
+          }
+
+          // ===== 本中周期进度卡：容量/强度双折线 + 减载周标记 + 已完成周实色 =====
+          SectionCard({ theme: this.theme, title: '本中周期进度' }) {
+            if (this.mesoPlan !== null) {
+              Text(`第 ${this.mesoWeek} / ${this.mesoPlan!.lengthWeeks} 周 · ${this.mesoPlan!.note}`)
+                .fontSize(12)
+                .fontColor(this.theme.palette.secondaryText)
+                .lineHeight(17)
+                .margin({ bottom: 8 })
+              Canvas(this.mesoCtx)
+                .width('100%')
+                .height(150)
+                .key(this.mesoCanvasKey)
+                .accessibilityText('本中周期容量与强度趋势图')
+                .onReady(() => {
+                  this.drawMesocycle();
+                })
+              if (this.mesoPlan!.deloadAdvised) {
+                Text('⚠ 疲劳偏高且进入平台期，建议本周立即减载')
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.warning)
+                  .margin({ top: 6 })
+              }
+            } else {
+              Text('中周期计划生成中…')
+                .fontSize(13)
+                .fontColor(this.theme.palette.secondaryText)
+            }
           }
 
           // ===== 今日营养达成环（完成一次分析后出现） =====
@@ -1393,16 +1601,35 @@ struct Index {
               .fontColor(this.theme.palette.secondaryText)
               .margin({ top: 4 })
             Row({ space: 8 }) {
-              Text('引擎 V2 对比（加权评分 + 趋势斜率）')
+              Text('引擎对比')
                 .fontSize(13)
                 .fontColor(this.theme.palette.primaryText)
                 .layoutWeight(1)
-              Toggle({ type: ToggleType.Switch, isOn: this.showV2 })
-                .selectedColor(this.theme.palette.accent)
-                .accessibilityText('切换引擎 V2 对比展示')
-                .onChange((on: boolean) => {
-                  this.showV2 = on;
-                })
+              // 分段选择器：仅 V1 报告 / V1·V2 并列对比（替代原开关）
+              Row() {
+                Text('仅 V1')
+                  .fontSize(12)
+                  .fontColor(!this.showV2 ? this.theme.palette.onAccent : this.theme.palette.primaryText)
+                  .textAlign(TextAlign.Center)
+                  .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                  .borderRadius({ topLeft: 13, bottomLeft: 13 })
+                  .backgroundColor(!this.showV2 ? this.theme.palette.accent : this.theme.palette.inputBackground)
+                  .accessibilityText('只展示 V1 引擎报告')
+                  .onClick(() => {
+                    this.showV2 = false;
+                  })
+                Text('V1·V2 对比')
+                  .fontSize(12)
+                  .fontColor(this.showV2 ? this.theme.palette.onAccent : this.theme.palette.primaryText)
+                  .textAlign(TextAlign.Center)
+                  .padding({ left: 12, right: 12, top: 5, bottom: 5 })
+                  .borderRadius({ topRight: 13, bottomRight: 13 })
+                  .backgroundColor(this.showV2 ? this.theme.palette.accent : this.theme.palette.inputBackground)
+                  .accessibilityText('并列对比 V1 与 V2 引擎报告')
+                  .onClick(() => {
+                    this.showV2 = true;
+                  })
+              }
             }
             .width('100%')
             .margin({ top: 8 })
@@ -1732,26 +1959,72 @@ struct Index {
         .margin({ top: 4 })
     }
 
-    // 引擎 V2 对比（加权评分 + 趋势斜率；开关在规则设置区）
-    SectionCard({ theme: this.theme, title: '引擎 V2 对比（实验）' }) {
+    // 引擎 V1·V2 并列对比（分段开关在规则设置区；差异字段用警告色描边标注）
+    SectionCard({ theme: this.theme, title: '引擎 V1 · V2 并列对比' }) {
       if (this.showV2 && this.reportV2 !== null) {
-        Text(`V1 负荷评估：${$$.report.assessment.loadStatus}（负荷 ${$$.report.assessment.load}）`)
-          .fontSize(13)
-          .fontColor(this.theme.palette.primaryText)
-        Text(`V2 负荷评估：${this.reportV2.assessment.loadStatus}（有效负荷 ${this.reportV2.assessment.load}）`)
-          .fontSize(13)
-          .fontColor(this.theme.palette.primaryText)
-          .margin({ top: 4 })
-        Text(`V2 下次训练：${this.reportV2.nextWorkout.workoutType} · ${this.reportV2.nextWorkout.intensity}`)
-          .fontSize(13)
+        Row({ space: 8 }) {
+          Text('对比项')
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+            .layoutWeight(1)
+          Text('V1')
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+            .width(92)
+            .textAlign(TextAlign.Center)
+          Text('V2')
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+            .width(92)
+            .textAlign(TextAlign.Center)
+        }
+        .width('100%')
+        .margin({ bottom: 6 })
+        this.compareRow('负荷状态', `${$$.report.assessment.loadStatus}（${$$.report.assessment.load}）`,
+          `${this.reportV2.assessment.loadStatus}（${this.reportV2.assessment.load}）`)
+        this.compareRow('恢复时长', `${$$.report.assessment.suggestedRecoveryHours}h`,
+          `${this.reportV2.assessment.suggestedRecoveryHours}h`)
+        this.compareRow('互补训练', `${$$.report.nextWorkout.workoutType}·${$$.report.nextWorkout.intensity}`,
+          `${this.reportV2.nextWorkout.workoutType}·${this.reportV2.nextWorkout.intensity}`)
+        this.compareRow('饮食热量', `${$$.report.diet.totalCalories}千卡`,
+          `${this.reportV2.diet.totalCalories}千卡`)
+        Text('警告色描边 = 两引擎结论不同的字段；V2 引入加权评分与历史趋势斜率')
+          .fontSize(11)
           .fontColor(this.theme.palette.secondaryText)
-          .margin({ top: 4 })
+          .margin({ top: 8 })
       } else {
-        Text('在下方「规则设置」中打开 V2 对比开关后，这里展示双引擎输出差异')
+        Text('在下方「规则设置」中选择「V1·V2 对比」后，这里并列展示双引擎报告差异')
           .fontSize(13)
           .fontColor(this.theme.palette.secondaryText)
       }
     }
+  }
+
+  /** V1/V2 对比行：两列值不同（差异字段）时用警告色描边高亮 */
+  @Builder
+  private compareRow(label: string, v1: string, v2: string): void {
+    Row({ space: 8 }) {
+      Text(label)
+        .fontSize(13)
+        .fontColor(this.theme.palette.primaryText)
+        .layoutWeight(1)
+      Text(v1)
+        .fontSize(12)
+        .fontColor(this.theme.palette.primaryText)
+        .width(92)
+        .textAlign(TextAlign.Center)
+      Text(v2)
+        .fontSize(12)
+        .fontColor(this.theme.palette.primaryText)
+        .width(92)
+        .textAlign(TextAlign.Center)
+    }
+    .width('100%')
+    .padding({ top: 6, bottom: 6, left: 8, right: 8 })
+    .borderRadius(10)
+    .border({ width: v1 === v2 ? 0 : 1.5, color: this.theme.palette.warning })
+    .backgroundColor(v1 === v2 ? this.theme.palette.cardBackground : this.theme.palette.inputBackground)
+    .margin({ bottom: 6 })
   }
 
   /** 一组食物卡片（Keep 风格：横向滑动，图片 + 名称 + 每 100g 热量） */
@@ -1843,6 +2116,70 @@ struct Index {
   }
 
   /** 准备度摘要行（参数局部收窄，规避 ArkTS 对 this 成员不做智能收窄的限制） */
+  /** 今日准备度卡内容：环形进度（档位四色）+ 参与因子 + 过度训练徽章（$$ 按引用传参） */
+  @Builder
+  private readinessCard($$: ReadinessRef): void {
+    SectionCard({ theme: this.theme, title: '今日准备度' }) {
+      Row({ space: 16 }) {
+        Stack() {
+          Progress({ value: $$.report.score, total: 100, type: ProgressType.Ring })
+            .width(76)
+            .height(76)
+            .color(this.tierColor($$.report.tier))
+            .backgroundColor(this.theme.palette.track)
+          Column() {
+            Text(`${$$.report.score}`)
+              .fontSize(20)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.tierColor($$.report.tier))
+            Text($$.report.tier)
+              .fontSize(10)
+              .fontColor(this.theme.palette.secondaryText)
+          }
+        }
+        .accessibilityText(`今日准备度 ${$$.report.score} 分，建议强度 ${$$.report.tier}`)
+        Column({ space: 4 }) {
+          Text(`建议强度：${$$.report.tier}`)
+            .fontSize(14)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.theme.palette.primaryText)
+          Text(`疲劳 ${this.readinessFatigue} · 睡眠 ${this.sleepHoursText}h · 酸痛 ${this.soreness}/5` +
+            (this.readinessHours >= 0 ? ` · 距上次 ${Math.round(this.readinessHours)}h` : ''))
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+            .lineHeight(17)
+          // 过度训练三级预警徽章（黄/橙/红，点击弹出命中条件）
+          if ($$.report.overtrainingLevel !== '无') {
+            Text(`${$$.report.overtrainingLevel}色预警 · 点击查看原因`)
+              .fontSize(12)
+              .fontColor(this.theme.palette.onAccent)
+              .padding({ left: 10, right: 10, top: 4, bottom: 4 })
+              .borderRadius(12)
+              .backgroundColor(this.overtrainingColor($$.report.overtrainingLevel))
+              .opacity($$.report.overtrainingLevel === '橙' ? 0.75 : 1)
+              .margin({ top: 2 })
+              .accessibilityText('查看过度训练预警命中条件')
+              .onClick(() => {
+                AlertDialog.show({
+                  title: `${$$.report.overtrainingLevel}色预警 · 命中条件`,
+                  message: this.overtrainingHits().join('\n'),
+                  confirm: {
+                    value: '知道了',
+                    action: () => {
+                    }
+                  }
+                });
+              })
+          }
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+    }
+  }
+
+  /** 准备度摘要行（每日状态卡内嵌展示） */
   @Builder
   private readinessLine(report: ReadinessReport | null): void {
     if (report !== null) {

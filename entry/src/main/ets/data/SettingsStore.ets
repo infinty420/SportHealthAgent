@@ -43,4 +43,14 @@ export class SettingsStore {
     config.overloadFactor = this.prefs.getSync(SettingsStore.KEY_FACTOR, defaults.overloadFactor) as number;
     return config;
   }
+
+  /** 中周期起始时间戳（0 = 未开始；首页「本中周期进度」卡据此推算当前周次） */
+  cycleStart(): number {
+    return this.prefs.getSync('mesoCycleStart', 0) as number;
+  }
+
+  saveCycleStart(timestamp: number): void {
+    this.prefs.putSync('mesoCycleStart', timestamp);
+    this.prefs.flush();
+  }
 }
