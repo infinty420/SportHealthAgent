@@ -21,6 +21,9 @@ import { NextWorkoutPlan } from '../AnalysisResult';
 const DEFAULT_LOAD_HIGH: number = 80;
 
 export class NextWorkoutPlanner {
+  /** 自定义互补映射（规则 DSL）：运动类型中文名 → 下一次训练类型，空映射走内置规则表 */
+  static overrides: Map<string, string> = new Map<string, string>();
+
   private readonly loadHigh: number;
 
   constructor(loadHigh: number = DEFAULT_LOAD_HIGH) {
@@ -28,13 +31,24 @@ export class NextWorkoutPlanner {
   }
 
   plan(record: HealthRecord): NextWorkoutPlan {
-    // 负荷超标：强制主动恢复，优先级高于类型推导
+    // 负荷超标：强制主动恢复，优先级高于类型推导与自定义映射
     if (record.trainingLoad >= this.loadHigh) {
       return {
         workoutType: '主动恢复（拉伸/散步）',
         intensity: '低',
         durationMin: 20,
         reason: '本次负荷超标，身体需要充分恢复；以低强度主动恢复促进血液循环、加速代谢废物清除，避免叠加疲劳。'
+      };
+    }
+
+    // 规则 DSL：用户自定义互补映射优先于内置规则表
+    const custom: string | undefined = NextWorkoutPlanner.overrides.get(record.sportType);
+    if (custom !== undefined && custom.length > 0) {
+      return {
+        workoutType: custom,
+        intensity: '中',
+        durationMin: 30,
+        reason: `命中规则表自定义互补映射：「${record.sportType}」→「${custom}」，按用户规则表执行。`
       };
     }
 

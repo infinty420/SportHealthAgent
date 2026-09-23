@@ -9,6 +9,7 @@
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
+import { RdbAdapter } from './RdbAdapter';
 
 /** 建议采纳状态：未标记 / 已采纳 / 已忽略 */
 export type AdoptedState = 'unmarked' | 'adopted' | 'ignored';
@@ -48,9 +49,13 @@ export class HistoryStore {
   private static readonly DAY_MS: number = 86400000;
 
   private readonly prefs: preferences.Preferences;
+  private readonly rdb: RdbAdapter;
 
   constructor(context: common.UIAbilityContext) {
     this.prefs = preferences.getPreferencesSync(context, { name: HistoryStore.STORE_NAME });
+    this.rdb = RdbAdapter.shared(context);
+    // RDB 迁移：首次将 preferences 整表导入，此后写路径双写、读路径 RDB 优先
+    this.rdb.ensureImported(HistoryStore.STORE_NAME, HistoryStore.KEY_RECORDS, this.prefs, '[]');
   }
 
   /** 追加一条记录（新记录排在最前） */
@@ -62,11 +67,20 @@ export class HistoryStore {
     }
     this.prefs.putSync(HistoryStore.KEY_RECORDS, JSON.stringify(list));
     this.prefs.flush();
+    this.rdb.write(HistoryStore.STORE_NAME, HistoryStore.KEY_RECORDS, JSON.stringify(list));
   }
 
   /** 读取全部记录（按时间倒序）；无数据或数据损坏时返回空数组 */
   list(): HistoryEntry[] {
-    const raw: string = this.prefs.getSync(HistoryStore.KEY_RECORDS, '[]') as string;
+    // 灰度双读：RDB 优先，未命中回退 preferences 并惰性回写
+    let raw: string = '';
+    const fromRdb: string | null = this.rdb.read(HistoryStore.STORE_NAME, HistoryStore.KEY_RECORDS);
+    if (fromRdb !== null) {
+      raw = fromRdb;
+    } else {
+      raw = this.prefs.getSync(HistoryStore.KEY_RECORDS, '[]') as string;
+      this.rdb.write(HistoryStore.STORE_NAME, HistoryStore.KEY_RECORDS, raw);
+    }
     try {
       const parsed: HistoryEntry[] = JSON.parse(raw) as HistoryEntry[];
       // 旧数据无 adopted 字段时兜底为未标记（不直接与 undefined 比较，规避 TS2367）
@@ -93,6 +107,7 @@ export class HistoryStore {
     }
     this.prefs.putSync(HistoryStore.KEY_RECORDS, JSON.stringify(list));
     this.prefs.flush();
+    this.rdb.write(HistoryStore.STORE_NAME, HistoryStore.KEY_RECORDS, JSON.stringify(list));
   }
 
   /** 最近 days 天的聚合统计（总时长/总热量/平均负荷/频次） */
@@ -141,5 +156,6 @@ export class HistoryStore {
   clear(): void {
     this.prefs.putSync(HistoryStore.KEY_RECORDS, '[]');
     this.prefs.flush();
+    this.rdb.write(HistoryStore.STORE_NAME, HistoryStore.KEY_RECORDS, '[]');
   }
 }

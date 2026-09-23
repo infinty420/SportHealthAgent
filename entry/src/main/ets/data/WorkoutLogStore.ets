@@ -9,6 +9,7 @@
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { WorkoutLog, WorkoutSet } from '../model/WorkoutLog';
+import { RdbAdapter } from './RdbAdapter';
 
 /** 存储用的纯数据结构（WorkoutLog 的可 JSON 化形态） */
 interface WorkoutLogRecord {
@@ -25,9 +26,13 @@ export class WorkoutLogStore {
   private static readonly DAY_MS: number = 86400000;
 
   private readonly prefs: preferences.Preferences;
+  private readonly rdb: RdbAdapter;
 
   constructor(context: common.UIAbilityContext) {
     this.prefs = preferences.getPreferencesSync(context, { name: WorkoutLogStore.STORE_NAME });
+    this.rdb = RdbAdapter.shared(context);
+    // RDB 迁移：首次将 preferences 整表导入，此后写路径双写、读路径 RDB 优先
+    this.rdb.ensureImported(WorkoutLogStore.STORE_NAME, WorkoutLogStore.KEY_RECORDS, this.prefs, '[]');
   }
 
   /** 追加一条训练日志（新记录排在最前）；调用前请先通过 log.validate() */
@@ -43,7 +48,15 @@ export class WorkoutLogStore {
 
   /** 读取全部日志（按时间倒序）；无数据或数据损坏时返回空数组 */
   list(): WorkoutLog[] {
-    const raw: string = this.prefs.getSync(WorkoutLogStore.KEY_RECORDS, '[]') as string;
+    // 灰度双读：RDB 优先，未命中回退 preferences 并惰性回写
+    let raw: string = '';
+    const fromRdb: string | null = this.rdb.read(WorkoutLogStore.STORE_NAME, WorkoutLogStore.KEY_RECORDS);
+    if (fromRdb !== null) {
+      raw = fromRdb;
+    } else {
+      raw = this.prefs.getSync(WorkoutLogStore.KEY_RECORDS, '[]') as string;
+      this.rdb.write(WorkoutLogStore.STORE_NAME, WorkoutLogStore.KEY_RECORDS, raw);
+    }
     try {
       const parsed: WorkoutLogRecord[] = JSON.parse(raw) as WorkoutLogRecord[];
       const result: WorkoutLog[] = [];
@@ -105,6 +118,7 @@ export class WorkoutLogStore {
   clear(): void {
     this.prefs.putSync(WorkoutLogStore.KEY_RECORDS, '[]');
     this.prefs.flush();
+    this.rdb.write(WorkoutLogStore.STORE_NAME, WorkoutLogStore.KEY_RECORDS, '[]');
   }
 
   /** 纯数据结构 → 模型实例（恢复 dateKey/totalVolume 等方法；旧数据无 rir 字段时兜底为 -1 未填） */
@@ -135,5 +149,6 @@ export class WorkoutLogStore {
     });
     this.prefs.putSync(WorkoutLogStore.KEY_RECORDS, JSON.stringify(records));
     this.prefs.flush();
+    this.rdb.write(WorkoutLogStore.STORE_NAME, WorkoutLogStore.KEY_RECORDS, JSON.stringify(records));
   }
 }

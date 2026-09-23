@@ -30,6 +30,9 @@ export interface OverloadSuggestion {
 }
 
 export class ProgressiveOverloadPlanner {
+  /** 单次加重步长（公斤），可由规则表 JSON 配置覆盖，默认 2.5 */
+  static weightStepKg: number = WEIGHT_STEP_KG;
+
   /**
    * 基于某动作的历史日志（时间正序）给出下一次训练建议。
    * 负重动作以估算 1RM 为进步标尺；自重动作（重量全 0）以总次数为标尺。
@@ -87,8 +90,8 @@ export class ProgressiveOverloadPlanner {
         suggestion.message = '上次总次数有进步，本次每组次数 +1，继续累积。';
       } else {
         suggestion.action = '加重';
-        suggestion.suggestedWeightKg = bestSet.weightKg + WEIGHT_STEP_KG;
-        suggestion.message = `上次估算 1RM 提升至 ${Math.round(lastScore)}kg，本次重量 +${WEIGHT_STEP_KG}kg。`;
+        suggestion.suggestedWeightKg = bestSet.weightKg + ProgressiveOverloadPlanner.weightStepKg;
+        suggestion.message = `上次估算 1RM 提升至 ${Math.round(lastScore)}kg，本次重量 +${ProgressiveOverloadPlanner.weightStepKg}kg。`;
       }
       return suggestion;
     }

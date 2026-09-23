@@ -24,6 +24,7 @@ import { NutritionCalculator, MacroAchievement } from '../data/NutritionCalculat
 import { FoodItem, FoodLibrary } from '../data/FoodLibrary';
 import { RuleAnalysisEngine } from '../agent/RuleAnalysisEngine';
 import { RuleAnalysisEngineV2 } from '../agent/RuleAnalysisEngineV2';
+import { RuleAnalysisEngineV3 } from '../agent/RuleAnalysisEngineV3';
 import { RuleConfig } from '../agent/RuleConfig';
 import { WorkoutLogStore } from '../data/WorkoutLogStore';
 import { WorkoutLog } from '../model/WorkoutLog';
@@ -35,6 +36,8 @@ import { FatigueModel, FatigueResult } from '../agent/rules/FatigueModel';
 import { ReadinessScorer, ReadinessInput, ReadinessReport } from '../agent/rules/ReadinessScorer';
 import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/MuscleBalanceAnalyzer';
 import { MesocyclePlanner, MesocyclePlan, MesocycleWeek } from '../agent/rules/MesocyclePlanner';
+import { PlanTemplates, PlanTemplate } from '../data/PlanTemplates';
+import { RuleTableStore, RuleTable, ComplementaryRule } from '../data/RuleTableStore';
 import { StrengthCalculator } from '../agent/rules/StrengthCalculator';
 import { HEAT_MUSCLE_GROUPS } from '../agent/rules/TrainingStatsAggregator';
 import { HeatColorUtil } from '../utils/HeatColorUtil';
@@ -85,6 +88,7 @@ struct Index {
   private mockSource: MockHealthKitSource = new MockHealthKitSource();
   private engine: RuleAnalysisEngine = new RuleAnalysisEngine();
   private engineV2: RuleAnalysisEngineV2 = new RuleAnalysisEngineV2();
+  private engineV3: RuleAnalysisEngineV3 = new RuleAnalysisEngineV3();
   private historyStore: HistoryStore | null = null;
   private settingsStore: SettingsStore | null = null;
   private profileStore: UserProfileStore | null = null;
@@ -116,8 +120,12 @@ struct Index {
   // 本中周期进度（MesocyclePlanner 输出 + Canvas 双折线）
   @State mesoPlan: MesocyclePlan | null = null;
   @State mesoWeek: number = 1;
+  @State mesoLength: number = 6;
+  @State mesoTemplate: string = '';
   @State mesoCanvasKey: string = 'meso-0';
   private mesoCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
+  /** 计划模板库（3.3：一键生成中周期） */
+  private readonly planTemplates: PlanTemplate[] = PlanTemplates.all();
 
   // 本周肌群容量热力（按部位有效组数；Canvas 人体色块直读）
   @State heatChest: number = 0;
@@ -150,9 +158,10 @@ struct Index {
   /** 发现页刷新信号：切到发现 Tab 时自增，触发日历数据重载 */
   @State discoverTick: number = 0;
 
-  // 分析结果与校验错误（reportV2 为双引擎对比输出）
+  // 分析结果与校验错误（reportV2/reportV3 为多引擎对比输出）
   @State report: AnalysisReport | null = null;
   @State reportV2: AnalysisReport | null = null;
+  @State reportV3: AnalysisReport | null = null;
   @State showV2: boolean = false;
   @State errors: string[] = [];
 
@@ -176,6 +185,10 @@ struct Index {
   @State proteinPct: number = 30;
   @State carbPct: number = 50;
   @State configErrors: string[] = [];
+  // 规则 DSL 状态：加重步长 + 互补映射草稿（与 SPORT_TYPE_LIST 等长对齐）
+  @State weightStepKg: number = 2.5;
+  @State complementaryDrafts: string[] = [];
+  private ruleTableStore: RuleTableStore | null = null;
 
   /** 页面创建：初始化本地存储，恢复设置/画像/目标与历史 */
   aboutToAppear(): void {
@@ -189,6 +202,19 @@ struct Index {
     this.injuryStore = new InjuryStore(context);
     this.wellnessStore = new WellnessLogStore(context);
     this.waterLog = new WaterLog(context);
+    this.ruleTableStore = new RuleTableStore(context);
+    const ruleTable: RuleTable = this.ruleTableStore.load();
+    RuleTableStore.applyStatics(ruleTable);
+    this.weightStepKg = ruleTable.weightStepKg;
+    // 互补映射草稿：与 SPORT_TYPE_LIST 一一对齐，未配置的类型留空字符串
+    const ruleMap: Map<string, string> = new Map<string, string>();
+    ruleTable.complementary.forEach((rule: ComplementaryRule): void => {
+      ruleMap.set(rule.sportType, rule.workoutType);
+    });
+    this.complementaryDrafts = SPORT_TYPE_LIST.map((type: string): string => {
+      const hit: string | undefined = ruleMap.get(type);
+      return hit === undefined ? '' : hit;
+    });
     const config: RuleConfig = this.settingsStore.load();
     this.highThreshold = config.highThreshold;
     this.normalThreshold = config.normalThreshold;
@@ -196,6 +222,7 @@ struct Index {
     this.carbPct = config.carbPct;
     this.engine.setConfig(config);
     this.engineV2.setConfig(config);
+    this.engineV3.setConfig(config);
     this.applyInjuries();
     this.reloadProfile();
     this.refreshHistory();
@@ -224,6 +251,7 @@ struct Index {
     const parts: string[] = this.injuryStore.activeParts();
     this.engine.setInjuries(parts);
     this.engineV2.setInjuries(parts);
+    this.engineV3.setInjuries(parts);
   }
 
   /** 载入今日状态到表单并刷新准备度 */
@@ -352,11 +380,23 @@ struct Index {
       this.settingsStore.saveCycleStart(start);
     }
     const fatigue: FatigueResult = FatigueModel.compute(this.history);
-    const plan: MesocyclePlan = MesocyclePlanner.plan(6, fatigue.index, false);
+    const plan: MesocyclePlan = MesocyclePlanner.plan(this.mesoLength, fatigue.index, false, this.mesoTemplate);
     this.mesoPlan = plan;
     const elapsed: number = Math.floor((Date.now() - start) / 604800000);
     this.mesoWeek = Math.min(plan.lengthWeeks, Math.max(1, 1 + elapsed));
     this.mesoCanvasKey = `meso-${this.mesoWeek}-${fatigue.index}`;
+  }
+
+  /** 一键套用计划模板：重置中周期起点并按模板周数重排（3.3） */
+  private applyTemplate(template: PlanTemplate): void {
+    if (this.settingsStore === null) {
+      return;
+    }
+    this.mesoLength = template.lengthWeeks;
+    this.mesoTemplate = template.name;
+    this.settingsStore.saveCycleStart(Date.now());
+    this.refreshMesocycle();
+    promptAction.showToast({ message: `已生成「${template.name}」${template.lengthWeeks} 周中周期` });
   }
 
   /** 今日是否训练日（历史记录中含今天的训练条目） */
@@ -660,6 +700,7 @@ struct Index {
     const profileOrNull: UserProfile | null = this.profile.filled ? this.profile : null;
     this.engine.setUserProfile(profileOrNull);
     this.engineV2.setUserProfile(profileOrNull);
+    this.engineV3.setUserProfile(profileOrNull);
     this.manualSource.setUserProfile(profileOrNull);
   }
 
@@ -677,6 +718,7 @@ struct Index {
     this.trendCanvasKey = `trend-${this.trendRange}-${this.history.length}-${Date.now() % 100000}`;
     this.engine.setHistory(this.history);
     this.engineV2.setHistory(this.history);
+    this.engineV3.setHistory(this.history);
     this.refreshIntake();
     this.refreshReadiness();
   }
@@ -762,9 +804,31 @@ struct Index {
     }
     this.engine.setConfig(config);
     this.engineV2.setConfig(config);
+    this.engineV3.setConfig(config);
     if (this.settingsStore !== null) {
       this.settingsStore.save(config);
     }
+  }
+
+  /** 应用规则 DSL：收集加重步长与互补映射草稿 → 持久化 → 注入引擎静态配置 */
+  private applyRuleTable(): void {
+    if (this.ruleTableStore === null) {
+      return;
+    }
+    const rules: ComplementaryRule[] = [];
+    SPORT_TYPE_LIST.forEach((type: string, index: number): void => {
+      const draft: string = index < this.complementaryDrafts.length ? this.complementaryDrafts[index].trim() : '';
+      if (draft.length > 0) {
+        rules.push({ sportType: type, workoutType: draft });
+      }
+    });
+    const table: RuleTable = {
+      version: 1,
+      weightStepKg: this.weightStepKg,
+      complementary: rules
+    };
+    this.ruleTableStore.save(table);
+    RuleTableStore.applyStatics(table);
   }
 
 
@@ -848,10 +912,12 @@ struct Index {
     if (result.record !== null) {
       this.report = this.engine.analyze(result.record);
       this.reportV2 = this.engineV2.analyze(result.record);
+      this.reportV3 = this.engineV3.analyze(result.record);
       this.recordHistory(result.record, this.report);
     } else {
       this.report = null;
       this.reportV2 = null;
+      this.reportV3 = null;
     }
   }
 
@@ -864,6 +930,7 @@ struct Index {
     this.errors = [];
     this.report = this.engine.analyze(record);
     this.reportV2 = this.engineV2.analyze(record);
+    this.reportV3 = this.engineV3.analyze(record);
     this.recordHistory(record, this.report);
   }
 
@@ -1733,6 +1800,44 @@ struct Index {
             }
           }
 
+          // ===== 计划模板库（3.3：5 套内置模板，一键生成中周期） =====
+          SectionCard({ theme: this.theme, title: '计划模板库' }) {
+            ForEach(this.planTemplates, (template: PlanTemplate) => {
+              Row({ space: 10 }) {
+                Column({ space: 3 }) {
+                  Text(`${template.name} · 每周 ${template.daysPerWeek} 练 · ${template.lengthWeeks} 周`)
+                    .fontSize(14)
+                    .fontWeight(FontWeight.Medium)
+                    .fontColor(this.theme.palette.primaryText)
+                  Text(`${template.split.join(' → ')}｜适合：${template.audience}`)
+                    .fontSize(11)
+                    .fontColor(this.theme.palette.secondaryText)
+                    .lineHeight(16)
+                }
+                .alignItems(HorizontalAlign.Start)
+                .layoutWeight(1)
+                Button(this.mesoTemplate === template.name ? '使用中' : '一键生成')
+                  .fontSize(12)
+                  .fontColor(this.mesoTemplate === template.name ?
+                    this.theme.palette.secondaryText : this.theme.palette.onAccent)
+                  .backgroundColor(this.mesoTemplate === template.name ?
+                    this.theme.palette.inputBackground : this.theme.palette.accent)
+                  .borderRadius(16)
+                  .height(32)
+                  .accessibilityText(`套用模板 ${template.name}`)
+                  .onClick(() => {
+                    this.applyTemplate(template);
+                  })
+              }
+              .width('100%')
+              .padding({ top: 8, bottom: 8 })
+            }, (template: PlanTemplate) => template.id)
+            Text('生成后重置「本中周期进度」为新模板的第 1 周；分化安排详见首页中周期卡')
+              .fontSize(11)
+              .fontColor(this.theme.palette.secondaryText)
+              .lineHeight(16)
+          }
+
           // ===== 规则设置 =====
           SectionCard({ theme: this.theme, title: '规则设置（端侧参数，实时生效）' }) {
             this.configSlider({
@@ -1767,6 +1872,56 @@ struct Index {
               .fontSize(12)
               .fontColor(this.theme.palette.secondaryText)
               .margin({ top: 4 })
+
+            // ===== 规则 DSL：加重步长与互补映射（JSON 规则表，改规则不改代码） =====
+            Column({ space: 2 }) {
+              Text(`渐进超负荷加重步长：${this.weightStepKg.toFixed(2)}kg`)
+                .fontSize(13)
+                .fontColor(this.theme.palette.secondaryText)
+              Slider({ value: this.weightStepKg, min: 1.25, max: 5, step: 1.25 })
+                .selectedColor(this.theme.palette.accent)
+                .trackColor(this.theme.palette.track)
+                .blockColor(this.theme.palette.accent)
+                .onChange((v: number) => {
+                  this.weightStepKg = Math.round(v * 100) / 100;
+                  this.applyRuleTable();
+                })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .margin({ top: 6, bottom: 8 })
+
+            Text('互补训练映射（留空 = 走内置规则表）')
+              .fontSize(13)
+              .fontColor(this.theme.palette.secondaryText)
+              .margin({ bottom: 4 })
+            ForEach(SPORT_TYPE_LIST, (type: string, index: number) => {
+              Row({ space: 8 }) {
+                Text(type)
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.primaryText)
+                  .width(72)
+                TextInput({ placeholder: '默认互补', text: index < this.complementaryDrafts.length ? this.complementaryDrafts[index] : '' })
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.primaryText)
+                  .placeholderColor(this.theme.palette.secondaryText)
+                  .backgroundColor(this.theme.palette.inputBackground)
+                  .borderRadius(8)
+                  .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+                  .layoutWeight(1)
+                  .onChange((v: string) => {
+                    const drafts: string[] = this.complementaryDrafts.slice();
+                    while (drafts.length < SPORT_TYPE_LIST.length) {
+                      drafts.push('');
+                    }
+                    drafts[index] = v;
+                    this.complementaryDrafts = drafts;
+                    this.applyRuleTable();
+                  })
+              }
+              .width('100%')
+              .margin({ bottom: 6 })
+            }, (type: string): string => type)
             Row({ space: 8 }) {
               Text('引擎对比')
                 .fontSize(13)
@@ -2126,10 +2281,10 @@ struct Index {
         .margin({ top: 4 })
     }
 
-    // 引擎 V1·V2 并列对比（分段开关在规则设置区；差异字段用警告色描边标注）
-    SectionCard({ theme: this.theme, title: '引擎 V1 · V2 并列对比' }) {
-      if (this.showV2 && this.reportV2 !== null) {
-        Row({ space: 8 }) {
+    // 引擎 V1·V2·V3 并列对比（分段开关在规则设置区；差异字段用警告色描边标注）
+    SectionCard({ theme: this.theme, title: '三引擎并列对比' }) {
+      if (this.showV2 && this.reportV2 !== null && this.reportV3 !== null) {
+        Row({ space: 6 }) {
           Text('对比项')
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
@@ -2137,60 +2292,75 @@ struct Index {
           Text('V1')
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
-            .width(92)
+            .width(74)
             .textAlign(TextAlign.Center)
           Text('V2')
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
-            .width(92)
+            .width(74)
+            .textAlign(TextAlign.Center)
+          Text('V3')
+            .fontSize(12)
+            .fontColor(this.theme.palette.secondaryText)
+            .width(74)
             .textAlign(TextAlign.Center)
         }
         .width('100%')
         .margin({ bottom: 6 })
         this.compareRow('负荷状态', `${$$.report.assessment.loadStatus}（${$$.report.assessment.load}）`,
-          `${this.reportV2.assessment.loadStatus}（${this.reportV2.assessment.load}）`)
+          `${this.reportV2.assessment.loadStatus}（${this.reportV2.assessment.load}）`,
+          `${this.reportV3.assessment.loadStatus}（${this.reportV3.assessment.load}）`)
         this.compareRow('恢复时长', `${$$.report.assessment.suggestedRecoveryHours}h`,
-          `${this.reportV2.assessment.suggestedRecoveryHours}h`)
+          `${this.reportV2.assessment.suggestedRecoveryHours}h`,
+          `${this.reportV3.assessment.suggestedRecoveryHours}h`)
         this.compareRow('互补训练', `${$$.report.nextWorkout.workoutType}·${$$.report.nextWorkout.intensity}`,
-          `${this.reportV2.nextWorkout.workoutType}·${this.reportV2.nextWorkout.intensity}`)
+          `${this.reportV2.nextWorkout.workoutType}·${this.reportV2.nextWorkout.intensity}`,
+          `${this.reportV3.nextWorkout.workoutType}·${this.reportV3.nextWorkout.intensity}`)
         this.compareRow('饮食热量', `${$$.report.diet.totalCalories}千卡`,
-          `${this.reportV2.diet.totalCalories}千卡`)
-        Text('警告色描边 = 两引擎结论不同的字段；V2 引入加权评分与历史趋势斜率')
+          `${this.reportV2.diet.totalCalories}千卡`,
+          `${this.reportV3.diet.totalCalories}千卡`)
+        Text('警告色描边 = 引擎结论不同的字段；V2 加权评分+趋势斜率，V3 另加采纳反馈加权')
           .fontSize(11)
           .fontColor(this.theme.palette.secondaryText)
           .margin({ top: 8 })
       } else {
-        Text('在下方「规则设置」中选择「V1·V2 对比」后，这里并列展示双引擎报告差异')
+        Text('在下方「规则设置」中选择「V1·V2 对比」后，这里并列展示三个引擎的报告差异')
           .fontSize(13)
           .fontColor(this.theme.palette.secondaryText)
       }
     }
   }
 
-  /** V1/V2 对比行：两列值不同（差异字段）时用警告色描边高亮 */
+  /** 三引擎对比行：任一列值不同（差异字段）时用警告色描边高亮 */
   @Builder
-  private compareRow(label: string, v1: string, v2: string): void {
-    Row({ space: 8 }) {
+  private compareRow(label: string, v1: string, v2: string, v3: string): void {
+    Row({ space: 6 }) {
       Text(label)
         .fontSize(13)
         .fontColor(this.theme.palette.primaryText)
         .layoutWeight(1)
       Text(v1)
-        .fontSize(12)
+        .fontSize(11)
         .fontColor(this.theme.palette.primaryText)
-        .width(92)
+        .width(74)
         .textAlign(TextAlign.Center)
       Text(v2)
-        .fontSize(12)
+        .fontSize(11)
         .fontColor(this.theme.palette.primaryText)
-        .width(92)
+        .width(74)
+        .textAlign(TextAlign.Center)
+      Text(v3)
+        .fontSize(11)
+        .fontColor(this.theme.palette.primaryText)
+        .width(74)
         .textAlign(TextAlign.Center)
     }
     .width('100%')
     .padding({ top: 6, bottom: 6, left: 8, right: 8 })
     .borderRadius(10)
-    .border({ width: v1 === v2 ? 0 : 1.5, color: this.theme.palette.warning })
-    .backgroundColor(v1 === v2 ? this.theme.palette.cardBackground : this.theme.palette.inputBackground)
+    .border({ width: v1 === v2 && v2 === v3 ? 0 : 1.5, color: this.theme.palette.warning })
+    .backgroundColor(v1 === v2 && v2 === v3 ? this.theme.palette.cardBackground :
+      this.theme.palette.inputBackground)
     .margin({ bottom: 6 })
   }
 

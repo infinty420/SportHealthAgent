@@ -7,6 +7,7 @@
  */
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
+import { RdbAdapter } from './RdbAdapter';
 
 /** 餐次 */
 export const MEAL_TYPES: string[] = ['早餐', '午餐', '晚餐', '加餐'];
@@ -35,17 +36,18 @@ export class DietLog {
   private static readonly STORE_NAME: string = 'diet_log';
 
   private readonly prefs: preferences.Preferences;
+  private readonly rdb: RdbAdapter;
 
   constructor(context: common.UIAbilityContext) {
     this.prefs = preferences.getPreferencesSync(context, { name: DietLog.STORE_NAME });
+    this.rdb = RdbAdapter.shared(context);
   }
 
-  /** 追加一条饮食记录 */
+  /** 追加一条饮食记录（preferences + RDB 双写） */
   logMeal(entry: DietLogEntry): void {
     const list: DietLogEntry[] = this.getAll();
     list.unshift(entry);
-    this.prefs.putSync(DietLog.storeKey(), JSON.stringify(list));
-    this.prefs.flush();
+    this.persist(list);
   }
 
   /** 今日全部记录（按时间倒序） */
@@ -57,12 +59,28 @@ export class DietLog {
   /** 删除一条记录（按时间戳定位） */
   remove(timestamp: number): void {
     const list: DietLogEntry[] = this.getAll().filter((e: DietLogEntry) => e.timestamp !== timestamp);
-    this.prefs.putSync(DietLog.storeKey(), JSON.stringify(list));
+    this.persist(list);
+  }
+
+  private persist(list: DietLogEntry[]): void {
+    const json: string = JSON.stringify(list);
+    const key: string = DietLog.storeKey();
+    this.prefs.putSync(key, json);
     this.prefs.flush();
+    this.rdb.write(DietLog.STORE_NAME, key, json);
   }
 
   private getAll(): DietLogEntry[] {
-    const raw: string = this.prefs.getSync(DietLog.storeKey(), '[]') as string;
+    // 灰度双读：RDB 优先，未命中回退 preferences 并惰性回写（按日期键自愈迁移）
+    const key: string = DietLog.storeKey();
+    let raw: string = '';
+    const fromRdb: string | null = this.rdb.read(DietLog.STORE_NAME, key);
+    if (fromRdb !== null) {
+      raw = fromRdb;
+    } else {
+      raw = this.prefs.getSync(key, '[]') as string;
+      this.rdb.write(DietLog.STORE_NAME, key, raw);
+    }
     try {
       return JSON.parse(raw) as DietLogEntry[];
     } catch (err) {

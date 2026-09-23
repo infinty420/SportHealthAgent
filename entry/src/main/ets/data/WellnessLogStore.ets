@@ -9,6 +9,7 @@
 
 import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
+import { RdbAdapter } from './RdbAdapter';
 
 /** 一天的自我状态记录（0/空值表示该项未填） */
 export interface WellnessEntry {
@@ -28,9 +29,11 @@ export class WellnessLogStore {
   private static readonly STORE_NAME: string = 'wellness_log';
 
   private readonly prefs: preferences.Preferences;
+  private readonly rdb: RdbAdapter;
 
   constructor(context: common.UIAbilityContext) {
     this.prefs = preferences.getPreferencesSync(context, { name: WellnessLogStore.STORE_NAME });
+    this.rdb = RdbAdapter.shared(context);
   }
 
   /** 当前日期键（YYYY-MM-DD，本地时区） */
@@ -58,13 +61,27 @@ export class WellnessLogStore {
         entry.waterMl = existing.waterMl;
       }
     }
-    this.prefs.putSync(WellnessLogStore.storeKey(entry.dateKey), JSON.stringify(entry));
+    const key: string = WellnessLogStore.storeKey(entry.dateKey);
+    const json: string = JSON.stringify(entry);
+    this.prefs.putSync(key, json);
     this.prefs.flush();
+    this.rdb.write(WellnessLogStore.STORE_NAME, key, json);
   }
 
   /** 读取指定日期的状态；无记录返回 null */
   get(dateKey: string): WellnessEntry | null {
-    const raw: string = this.prefs.getSync(WellnessLogStore.storeKey(dateKey), '') as string;
+    // 灰度双读：RDB 优先，未命中回退 preferences 并惰性回写（按日期键自愈迁移）
+    const key: string = WellnessLogStore.storeKey(dateKey);
+    let raw: string = '';
+    const fromRdb: string | null = this.rdb.read(WellnessLogStore.STORE_NAME, key);
+    if (fromRdb !== null) {
+      raw = fromRdb;
+    } else {
+      raw = this.prefs.getSync(key, '') as string;
+      if (raw.length > 0) {
+        this.rdb.write(WellnessLogStore.STORE_NAME, key, raw);
+      }
+    }
     if (raw.length === 0) {
       return null;
     }

@@ -52,8 +52,10 @@ export class MesocyclePlanner {
    * @param lengthWeeks 期望周数（钳制到 4–8）
    * @param fatigueIndex 当前疲劳指数（FatigueModel.compute 输出，0–100）
    * @param plateau 是否处于平台期（渐进超负荷模块判定）
+   * @param templateName 计划模板名（可选，来自 PlanTemplates；仅用于说明文案）
    */
-  static plan(lengthWeeks: number = 6, fatigueIndex: number = 0, plateau: boolean = false): MesocyclePlan {
+  static plan(lengthWeeks: number = 6, fatigueIndex: number = 0, plateau: boolean = false,
+    templateName: string = ''): MesocyclePlan {
     const length: number = Math.min(MesocyclePlanner.MAX_WEEKS,
       Math.max(MesocyclePlanner.MIN_WEEKS, Math.round(lengthWeeks)));
     const weeks: MesocycleWeek[] = [];
@@ -88,13 +90,14 @@ export class MesocyclePlanner {
       }
     }
     const advised: boolean = fatigueIndex >= MesocyclePlanner.DELOAD_FATIGUE_MIN && plateau;
+    const prefix: string = templateName.length > 0 ? `${templateName} · ` : '';
     const plan: MesocyclePlan = {
       weeks: weeks,
       lengthWeeks: length,
       deloadAdvised: advised,
       note: advised ?
         `当前疲劳 ${fatigueIndex} 且进入平台期，建议本周立即执行减载（容量 60%）` :
-        `${length} 周中周期：波浪渐进 + 末周减载`
+        `${prefix}${length} 周中周期：波浪渐进 + 末周减载`
     };
     return plan;
   }
