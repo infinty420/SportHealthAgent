@@ -581,14 +581,17 @@ struct ReportPage {
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.theme.palette.primaryText)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
           .margin({ left: 12 })
-        Blank()
         Button('分享卡')
           .fontSize(13)
           .fontColor(this.theme.palette.accent)
           .backgroundColor(this.theme.palette.inputBackground)
           .borderRadius(16)
           .height(32)
+          .margin({ right: 8 })
           .accessibilityText('生成训练周报分享卡片图片')
           .onClick(() => {
             this.exportShareCard();
