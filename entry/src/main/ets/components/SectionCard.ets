@@ -5,6 +5,7 @@
  */
 import { ThemeManager } from '../theme/ThemeManager';
 import { SoftGlowUtil } from '../utils/SoftGlowUtil';
+import { IconBadge } from './IconBadge';
 
 /** 带标题的卡片容器，三大分析模块共用 */
 @Component
@@ -16,6 +17,10 @@ export struct SectionCard {
   @Prop index: string = '';
   /** 可选柔光底纹（accentGlow 径向渐变，预生成缓存，非每帧绘制） */
   @Prop glow: boolean = false;
+  /** 可选标题图标资源名（如 'app.media.ic_training'），空串不显示 */
+  @Prop iconRes: string = '';
+  /** 图标徽章色调：blue / green / orange / red */
+  @Prop accentTone: string = 'blue';
   /** 卡片内容插槽 */
   @BuilderParam content: () => void;
   /** 入场动效标记：onAppear 后 250ms 淡入上滑 */
@@ -24,6 +29,10 @@ export struct SectionCard {
   build() {
     Column() {
       Row({ space: 8 }) {
+        if (this.iconRes.length > 0) {
+          // 36×36 软底图标徽章（tone 取 *Soft/语义色）
+          IconBadge({ theme: this.theme, iconRes: this.iconRes, tone: this.accentTone, badgeSize: 36 })
+        }
         if (this.index.length > 0) {
           Text(this.index)
             .fontSize(12)
@@ -36,6 +45,7 @@ export struct SectionCard {
           .fontWeight(FontWeight.Medium)
           .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
       }
+      .alignItems(VerticalAlign.Center)
       .margin({ bottom: 12 })
       this.content()
     }

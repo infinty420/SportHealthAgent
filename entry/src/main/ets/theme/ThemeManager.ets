@@ -54,6 +54,19 @@ export interface Palette {
   paper?: string;
   /** 强调色柔光（可选，视觉升级新增；8% 透明度 glow 背景） */
   accentGlow?: string;
+  /** 同色系渐变对·起始（可选；取 accent 同族偏深一档，用于渐变按钮/选中胶囊/渐变描边） */
+  accentStart?: string;
+  /** 同色系渐变对·结束（可选；取 accent 同族偏亮一档，禁止跨色相） */
+  accentEnd?: string;
+  /** 语义色浅底（可选；各取对应语义色约 12% 不透明度，深浅两套分别调校保证对比度） */
+  successSoft?: string;
+  warningSoft?: string;
+  dangerSoft?: string;
+  proteinSoft?: string;
+  carbSoft?: string;
+  fatSoft?: string;
+  /** 强调卡底色（可选；比 cardBackground 略亮/略暗一档，用于用户信息卡等强调位） */
+  cardElevated?: string;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -96,7 +109,16 @@ export class ThemeManager {
     cardShadow: '#14000000',
     ink: '#1A1C1E',
     paper: '#F0F2F5',
-    accentGlow: '#143D6BFF'
+    accentGlow: '#143D6BFF',
+    accentStart: '#2F6BFF',
+    accentEnd: '#5B86FF',
+    successSoft: '#1F22A06B',
+    warningSoft: '#1FE8A13A',
+    dangerSoft: '#1FE5484D',
+    proteinSoft: '#1FE5484D',
+    carbSoft: '#1F3D6BFF',
+    fatSoft: '#1FE8A13A',
+    cardElevated: '#F7F9FC'
   };
 
   /** 深色调色板（全应用深色颜色唯一定义处） */
@@ -122,7 +144,16 @@ export class ThemeManager {
     cardShadow: '#66000000',
     ink: '#F2F4F6',
     paper: '#15171A',
-    accentGlow: '#285B8DEF'
+    accentGlow: '#285B8DEF',
+    accentStart: '#3F6FD6',
+    accentEnd: '#7FA5F0',
+    successSoft: '#333ECF92',
+    warningSoft: '#33F2B75C',
+    dangerSoft: '#33FF6B70',
+    proteinSoft: '#33FF6B70',
+    carbSoft: '#335B8DEF',
+    fatSoft: '#33F2B75C',
+    cardElevated: '#22262B'
   };
 
   /** 当前生效的调色板：组件一律通过 theme.palette.* 取色 */

@@ -13,16 +13,26 @@ export struct EmptyState {
   @Prop message: string = '';
   /** 可选行动按钮文案；空串则不显示按钮 */
   @Prop actionLabel: string = '';
+  /** 可选大插图（bg_empty 哑铃线稿，180vp）；false 时用 48vp 线框小人 */
+  @Prop illustration: boolean = false;
   /** 按钮点击回调（可选，不传则按钮不响应） */
   onAction?: () => void;
 
   build() {
     Column({ space: 12 }) {
-      Image($r('app.media.companion'))
-        .width(48)
-        .height(48)
-        .fillColor(this.theme.palette.secondaryText)
-        .accessibilityLevel('no')
+      if (this.illustration) {
+        // 哑铃线稿大插图（透明底 PNG，深浅两套按主题切换）
+        Image(this.theme.mode === 'dark' ? $r('app.media.bg_empty_dark') : $r('app.media.bg_empty_light'))
+          .width(180)
+          .height(180)
+          .accessibilityLevel('no')
+      } else {
+        Image($r('app.media.companion'))
+          .width(48)
+          .height(48)
+          .fillColor(this.theme.palette.secondaryText)
+          .accessibilityLevel('no')
+      }
       Text(this.message)
         .fontSize(13)
         .fontColor(this.theme.palette.secondaryText)

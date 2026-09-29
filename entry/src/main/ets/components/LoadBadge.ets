@@ -28,6 +28,17 @@ export struct LoadBadge {
     return this.theme.palette.warning;
   }
 
+  /** 状态 → 胶囊软底色（*Soft，缺省回退 inputBackground） */
+  private statusSoftColor(): string {
+    if (this.status === '超标') {
+      return this.theme.palette.dangerSoft ?? this.theme.palette.inputBackground;
+    }
+    if (this.status === '正常') {
+      return this.theme.palette.successSoft ?? this.theme.palette.inputBackground;
+    }
+    return this.theme.palette.warningSoft ?? this.theme.palette.inputBackground;
+  }
+
   build() {
     Row({ space: 8 }) {
       // 状态色点
@@ -46,7 +57,7 @@ export struct LoadBadge {
     .alignItems(VerticalAlign.Center)
     .padding({ left: 12, right: 12, top: 4, bottom: 4 })
     .borderRadius(14)
-    .backgroundColor(this.theme.palette.inputBackground)
+    .backgroundColor(this.statusSoftColor())
     .accessibilityText(`负荷 ${this.load}，状态${this.status}`)
     .onAppear(() => {
       // 数字滚动：400ms 内 8 帧从 0 滚到目标值
