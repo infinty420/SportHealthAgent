@@ -1114,18 +1114,7 @@ struct Index {
       Scroll() {
         Column() {
           // ===== 问候横幅：时段问候 + 日期 + 训练摘要 + 准备度圆环（渐变卡 + 柔光叠加） =====
-          Stack() {
-            // 柔光层（accentGlow 径向渐变，预生成色组，装饰用）
-            Row()
-              .width('100%')
-              .height('100%')
-              .radialGradient({
-                center: ['85%', '0%'],
-                radius: 240,
-                colors: SoftGlowUtil.getGlowColors(this.theme.palette.accentGlow ?? this.theme.palette.heroEnd)
-              })
-              .accessibilityLevel('no')
-            Column() {
+          Column() {
             Row() {
               Column({ space: 4 }) {
                 Text(this.greeting())
@@ -1165,14 +1154,18 @@ struct Index {
               .accessibilityText(this.readiness === null ? '准备度未知' : `准备度 ${this.readiness.score} 分`)
             }
             .width('100%')
-            }
-            .width('100%')
-            .padding(16)
           }
           .width('100%')
+          .padding(16)
           .borderRadius(20)
           .clip(true)
           .linearGradient({ angle: 135, colors: [[this.theme.palette.heroStart, 0.0], [this.theme.palette.heroEnd, 1.0]] })
+          // 柔光层：radialGradient 直接叠加在 linearGradient 之上（装饰用，随内容高度自适应）
+          .radialGradient({
+            center: ['85%', '0%'],
+            radius: 240,
+            colors: SoftGlowUtil.getGlowColors(this.theme.palette.accentGlow ?? this.theme.palette.heroEnd)
+          })
           .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
           .margin({ bottom: 14 })
 
