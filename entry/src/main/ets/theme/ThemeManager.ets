@@ -48,6 +48,12 @@ export interface Palette {
   onHero: string;
   /** 卡片柔和投影色 */
   cardShadow: string;
+  /** 标题墨色（可选，视觉升级新增；缺省时用 primaryText） */
+  ink?: string;
+  /** 极淡背景纹理色（可选，视觉升级新增；卡片微纹理用） */
+  paper?: string;
+  /** 强调色柔光（可选，视觉升级新增；8% 透明度 glow 背景） */
+  accentGlow?: string;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -74,20 +80,23 @@ export class ThemeManager {
     inputBackground: '#EEF1F5',
     primaryText: '#1A1C1E',
     secondaryText: '#6B7280',
-    accent: '#2F6BFF',
+    accent: '#3D6BFF',
     onAccent: '#FFFFFF',
     success: '#22A06B',
     warning: '#E8A13A',
     danger: '#E5484D',
     track: '#E3E7EC',
     protein: '#E5484D',
-    carb: '#2F6BFF',
+    carb: '#3D6BFF',
     fat: '#E8A13A',
     accentSoft: '#E4ECFF',
-    heroStart: '#3D74FF',
+    heroStart: '#2E5BFF',
     heroEnd: '#7BA6FF',
     onHero: '#FFFFFF',
-    cardShadow: '#14000000'
+    cardShadow: '#14000000',
+    ink: '#1A1C1E',
+    paper: '#F0F2F5',
+    accentGlow: '#143D6BFF'
   };
 
   /** 深色调色板（全应用深色颜色唯一定义处） */
@@ -97,20 +106,23 @@ export class ThemeManager {
     inputBackground: '#262A2F',
     primaryText: '#F2F4F6',
     secondaryText: '#9AA1A9',
-    accent: '#6E9BFF',
+    accent: '#5B8DEF',
     onAccent: '#0E1116',
     success: '#3ECF92',
     warning: '#F2B75C',
     danger: '#FF6B70',
     track: '#33383E',
     protein: '#FF6B70',
-    carb: '#6E9BFF',
+    carb: '#5B8DEF',
     fat: '#F2B75C',
     accentSoft: '#24344F',
     heroStart: '#1F3A6E',
-    heroEnd: '#2E4E8F',
+    heroEnd: '#3D6BFF',
     onHero: '#FFFFFF',
-    cardShadow: '#66000000'
+    cardShadow: '#66000000',
+    ink: '#F2F4F6',
+    paper: '#15171A',
+    accentGlow: '#285B8DEF'
   };
 
   /** 当前生效的调色板：组件一律通过 theme.palette.* 取色 */
