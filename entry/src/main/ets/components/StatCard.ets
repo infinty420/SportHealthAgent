@@ -74,17 +74,27 @@ export struct StatCard {
               .fontWeight(Typography.fontWeight('numberXL'))
               .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
               .maxLines(1)
-            if (this.unit.length > 0) {
+            // 紧凑卡横向空间不足，单位挪到标签行，避免与右上徽章重叠
+            if (!this.compact && this.unit.length > 0) {
               Text(this.unit)
                 .fontSize(12)
                 .fontColor(this.theme.palette.secondaryText)
-                .margin({ top: this.compact ? 6 : 14 })
+                .margin({ top: 14 })
             }
           }
           .alignItems(VerticalAlign.Bottom)
-          Text(this.label)
-            .fontSize(12)
-            .fontColor(this.theme.palette.secondaryText)
+          Row({ space: 4 }) {
+            Text(this.label)
+              .fontSize(12)
+              .fontColor(this.theme.palette.secondaryText)
+              .maxLines(1)
+            if (this.compact && this.unit.length > 0) {
+              Text(`· ${this.unit}`)
+                .fontSize(11)
+                .fontColor(this.theme.palette.secondaryText)
+                .maxLines(1)
+            }
+          }
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
