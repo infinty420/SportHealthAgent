@@ -1117,7 +1117,7 @@ struct Index {
         Button('📊 报表')
           .fontSize(14)
           .fontColor(this.theme.palette.accent)
-          .backgroundColor(this.theme.palette.inputBackground)
+          .backgroundColor(this.theme.palette.accentSoft)
           .borderRadius(18)
           .height(36)
           .margin({ right: 8 })
@@ -1131,7 +1131,8 @@ struct Index {
         ThemeToggle({ theme: this.theme })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .alignItems(VerticalAlign.Center)
+      .padding({ left: 16, right: 16, top: 24, bottom: 12 })
 
       Scroll() {
         Column() {
