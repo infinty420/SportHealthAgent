@@ -1,8 +1,10 @@
 /*
  * 文件标注：AI 生成 —— 负荷状态色标（通用 UI 组件）
  * 约束：组件内禁止硬编码色值，一律读取 theme.palette.*。
+ * 视觉升级：克制化——状态点 + 大数值（accent 纯色）+ 状态文案，无任何放射装饰。
  */
 import { ThemeManager } from '../theme/ThemeManager';
+import { Typography } from '../utils/Typography';
 
 /** 负荷状态徽标：按 超标/正常/偏低 映射到 危险/成功/警告 语义色 */
 @Component
@@ -29,13 +31,20 @@ export struct LoadBadge {
       // 状态色点
       Circle({ width: 10, height: 10 })
         .fill(this.statusColor())
-      Text(`负荷 ${this.load} · ${this.status}`)
-        .fontSize(15)
+      // 大数值（accent 纯色）+ 状态文案（状态色）
+      Text(`${this.load}`)
+        .fontSize(Typography.fontSize('numberL'))
+        .fontWeight(Typography.fontWeight('numberL'))
+        .fontColor(this.theme.palette.accent)
+      Text(this.status)
+        .fontSize(Typography.fontSize('bodyM'))
         .fontWeight(FontWeight.Medium)
         .fontColor(this.statusColor())
     }
-    .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+    .alignItems(VerticalAlign.Center)
+    .padding({ left: 12, right: 12, top: 4, bottom: 4 })
     .borderRadius(14)
     .backgroundColor(this.theme.palette.inputBackground)
+    .accessibilityText(`负荷 ${this.load}，状态${this.status}`)
   }
 }
