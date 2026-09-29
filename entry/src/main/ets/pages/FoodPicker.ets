@@ -13,6 +13,7 @@ import { ThemeManager } from '../theme/ThemeManager';
 import { FoodItem, FoodLibrary, FOOD_CATEGORIES } from '../data/FoodLibrary';
 import { DietLog, DietLogEntry, MEAL_TYPES } from '../data/DietLog';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { BackgroundLayer } from '../components/BackgroundLayer';
 
 @Entry
 @Component
@@ -78,7 +79,10 @@ struct FoodPickerPage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底，固定不滚动）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       // ===== 顶部栏 =====
       Row() {
         Button('‹ 返回')
@@ -102,18 +106,30 @@ struct FoodPickerPage {
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 8 })
 
-      // ===== 搜索框 =====
-      TextInput({ placeholder: $r('app.string.food_picker_search'), text: this.keyword })
-        .fontColor(this.theme.palette.primaryText)
-        .placeholderColor(this.theme.palette.secondaryText)
-        .backgroundColor(this.theme.palette.inputBackground)
-        .caretColor(this.theme.palette.accent)
-        .borderRadius(10)
-        .margin({ left: 16, right: 16, bottom: 10 })
-        .onChange((v: string) => {
-          this.keyword = v;
-          this.applyFilter();
-        })
+      // ===== 搜索框（左侧 ic_search 线性图标） =====
+      Row({ space: 8 }) {
+        Image($r('app.media.ic_search'))
+          .width(18)
+          .height(18)
+          .fillColor(this.theme.palette.secondaryText)
+          .margin({ left: 12 })
+          .accessibilityLevel('no')
+        TextInput({ placeholder: $r('app.string.food_picker_search'), text: this.keyword })
+          .fontColor(this.theme.palette.primaryText)
+          .placeholderColor(this.theme.palette.secondaryText)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .caretColor(this.theme.palette.accent)
+          .layoutWeight(1)
+          .onChange((v: string) => {
+            this.keyword = v;
+            this.applyFilter();
+          })
+      }
+      .width('100%')
+      .borderRadius(10)
+      .backgroundColor(this.theme.palette.inputBackground)
+      .padding({ left: 4, right: 12 })
+      .margin({ left: 16, right: 16, bottom: 10 })
 
       // ===== 分类筛选条 =====
       Scroll() {
@@ -153,11 +169,31 @@ struct FoodPickerPage {
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(this.theme.palette.primaryText)
-              Text(`${item.kcalPer100g} kcal/100g · 蛋白 ${item.proteinPer100g}g`)
+              Text(`${item.kcalPer100g} kcal/100g`)
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
                 .maxLines(1)
-                .textOverflow({ overflow: TextOverflow.Ellipsis })
+              Row({ space: 4 }) {
+                Text(`蛋${item.proteinPer100g}`)
+                  .fontSize(9)
+                  .fontColor(this.theme.palette.protein)
+                  .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                  .borderRadius(8)
+                  .backgroundColor(this.theme.palette.proteinSoft ?? this.theme.palette.inputBackground)
+                Text(`碳${item.carbPer100g}`)
+                  .fontSize(9)
+                  .fontColor(this.theme.palette.carb)
+                  .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                  .borderRadius(8)
+                  .backgroundColor(this.theme.palette.carbSoft ?? this.theme.palette.inputBackground)
+                Text(`脂${item.fatPer100g}`)
+                  .fontSize(9)
+                  .fontColor(this.theme.palette.fat)
+                  .padding({ left: 5, right: 5, top: 2, bottom: 2 })
+                  .borderRadius(8)
+                  .backgroundColor(this.theme.palette.fatSoft ?? this.theme.palette.inputBackground)
+              }
+              .accessibilityLevel('no')
             }
             .alignItems(HorizontalAlign.Start)
             .padding(8)
@@ -184,9 +220,11 @@ struct FoodPickerPage {
       // ===== 底部：份量 + 餐次 + 添加 =====
       this.bottomPanel(this.selectedFood)
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 底部操作面板（参数局部收窄，规避 ArkTS 对 this 成员不做智能收窄的限制） */

@@ -12,8 +12,8 @@ import { IconBadge } from './IconBadge';
 @Component
 export struct StatCard {
   @ObjectLink theme: ThemeManager;
-  /** 小标签，如「总时长」 */
-  @Prop label: string = '';
+  /** 小标签，如「总时长」（支持 string 与 $r 资源） */
+  @Prop label: ResourceStr = '';
   /** 大数字文案（已格式化，如 '120'） */
   @Prop value: string = '';
   /** 单位，如 '分钟'；空串不显示 */
@@ -22,6 +22,10 @@ export struct StatCard {
   @Prop iconRes: string = '';
   /** 色调：blue / green / orange / red */
   @Prop tone: string = 'blue';
+  /** 入场错峰延迟（ms），默认 0；仅首屏前几张卡片传入 */
+  @Prop enterDelay: number = 0;
+  /** 入场动效标记 */
+  @State private entered: boolean = false;
 
   /** tone → 语义色（渐变条端色推导基准） */
   private toneColor(): string {
@@ -95,6 +99,17 @@ export struct StatCard {
     .clip(true)
     .backgroundColor(this.theme.palette.cardBackground)
     .shadow({ radius: DesignTokens.shadowMdRadius, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: DesignTokens.shadowMdOffsetY })
-    .accessibilityText(`${this.label} ${this.value}${this.unit}`)
+    .accessibilityText((typeof this.label === 'string' ? `${this.label} ` : '') + `${this.value}${this.unit}`)
+    .opacity(this.entered ? 1 : 0)
+    .translate({ x: 0, y: this.entered ? 0 : 12 })
+    .onAppear(() => {
+      // 入场：250ms ease 淡入上滑（可选错峰延迟，仅首屏前几张传入）
+      const timerId: number = setTimeout(() => {
+        animateTo({ duration: 250, curve: Curve.EaseOut }, () => {
+          this.entered = true;
+        });
+        clearTimeout(timerId);
+      }, this.enterDelay);
+    })
   }
 }

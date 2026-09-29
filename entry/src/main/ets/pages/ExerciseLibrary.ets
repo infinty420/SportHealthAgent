@@ -106,20 +106,39 @@ export struct ExerciseLibraryPage {
             this.applyFilter();
           })
         ForEach(this.difficulties, (diff: string) => {
-          Text(diff)
-            .fontSize(12)
-            .fontColor(this.selectedDifficulty === diff ?
-              this.theme.palette.onAccent : this.theme.palette.primaryText)
-            .textAlign(TextAlign.Center)
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .borderRadius(13)
-            .backgroundColor(this.selectedDifficulty === diff ?
-              this.theme.palette.accent : this.theme.palette.inputBackground)
-            .accessibilityText(`按难度 ${diff} 筛选`)
-            .onClick(() => {
-              this.selectedDifficulty = diff;
-              this.applyFilter();
-            })
+          if (this.selectedDifficulty === diff) {
+            Text(diff)
+              .fontSize(12)
+              .fontColor(this.theme.palette.onAccent)
+              .textAlign(TextAlign.Center)
+              .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+              .borderRadius(13)
+              .linearGradient({
+                angle: 90,
+                colors: [
+                  [this.theme.palette.accentStart ?? this.theme.palette.accent, 0.0],
+                  [this.theme.palette.accentEnd ?? this.theme.palette.accent, 1.0]
+                ]
+              })
+              .accessibilityText(`按难度 ${diff} 筛选`)
+              .onClick(() => {
+                this.selectedDifficulty = diff;
+                this.applyFilter();
+              })
+          } else {
+            Text(diff)
+              .fontSize(12)
+              .fontColor(this.theme.palette.primaryText)
+              .textAlign(TextAlign.Center)
+              .padding({ left: 10, right: 10, top: 6, bottom: 6 })
+              .borderRadius(13)
+              .backgroundColor(this.theme.palette.inputBackground)
+              .accessibilityText(`按难度 ${diff} 筛选`)
+              .onClick(() => {
+                this.selectedDifficulty = diff;
+                this.applyFilter();
+              })
+          }
         }, (diff: string) => diff)
       }
       .width('100%')
@@ -129,17 +148,33 @@ export struct ExerciseLibraryPage {
       Scroll() {
         Row({ space: 8 }) {
           ForEach(this.equipments, (equipment: string) => {
-            Text(equipment)
-              .fontSize(13)
-              .fontColor(this.selectedEquipment === equipment ?
-                this.theme.palette.onAccent : this.theme.palette.primaryText)
-              .padding({ left: 14, right: 14, top: 7, bottom: 7 })
-              .borderRadius(16)
-              .backgroundColor(this.selectedEquipment === equipment ?
-                this.theme.palette.accent : this.theme.palette.inputBackground)
-              .onClick(() => {
-                this.selectEquipment(equipment);
-              })
+            if (this.selectedEquipment === equipment) {
+              Text(equipment)
+                .fontSize(13)
+                .fontColor(this.theme.palette.onAccent)
+                .padding({ left: 14, right: 14, top: 7, bottom: 7 })
+                .borderRadius(16)
+                .linearGradient({
+                  angle: 90,
+                  colors: [
+                    [this.theme.palette.accentStart ?? this.theme.palette.accent, 0.0],
+                    [this.theme.palette.accentEnd ?? this.theme.palette.accent, 1.0]
+                  ]
+                })
+                .onClick(() => {
+                  this.selectEquipment(equipment);
+                })
+            } else {
+              Text(equipment)
+                .fontSize(13)
+                .fontColor(this.theme.palette.primaryText)
+                .padding({ left: 14, right: 14, top: 7, bottom: 7 })
+                .borderRadius(16)
+                .backgroundColor(this.theme.palette.inputBackground)
+                .onClick(() => {
+                  this.selectEquipment(equipment);
+                })
+            }
           }, (equipment: string) => equipment)
         }
         .padding({ left: 16, right: 16 })
@@ -155,19 +190,37 @@ export struct ExerciseLibraryPage {
         Scroll() {
           Column({ space: 6 }) {
             ForEach(this.muscles, (muscle: string) => {
-              Text(muscle)
-                .fontSize(13)
-                .fontColor(this.selectedMuscle === muscle ?
-                  this.theme.palette.onAccent : this.theme.palette.primaryText)
-                .textAlign(TextAlign.Center)
-                .width(72)
-                .padding({ top: 9, bottom: 9 })
-                .borderRadius(12)
-                .backgroundColor(this.selectedMuscle === muscle ?
-                  this.theme.palette.accent : this.theme.palette.inputBackground)
-                .onClick(() => {
-                  this.selectMuscle(muscle);
-                })
+              if (this.selectedMuscle === muscle) {
+                Text(muscle)
+                  .fontSize(13)
+                  .fontColor(this.theme.palette.onAccent)
+                  .textAlign(TextAlign.Center)
+                  .width(72)
+                  .padding({ top: 9, bottom: 9 })
+                  .borderRadius(12)
+                  .linearGradient({
+                    angle: 90,
+                    colors: [
+                      [this.theme.palette.accentStart ?? this.theme.palette.accent, 0.0],
+                      [this.theme.palette.accentEnd ?? this.theme.palette.accent, 1.0]
+                    ]
+                  })
+                  .onClick(() => {
+                    this.selectMuscle(muscle);
+                  })
+              } else {
+                Text(muscle)
+                  .fontSize(13)
+                  .fontColor(this.theme.palette.primaryText)
+                  .textAlign(TextAlign.Center)
+                  .width(72)
+                  .padding({ top: 9, bottom: 9 })
+                  .borderRadius(12)
+                  .backgroundColor(this.theme.palette.inputBackground)
+                  .onClick(() => {
+                    this.selectMuscle(muscle);
+                  })
+              }
             }, (muscle: string) => muscle)
           }
           .padding({ left: 16, right: 8, bottom: 24 })
@@ -214,6 +267,10 @@ export struct ExerciseLibraryPage {
               .borderRadius(20)
               .backgroundColor(this.theme.palette.cardBackground)
               .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
+              .stateStyles({
+                pressed: { .backgroundColor(this.theme.palette.paper ?? this.theme.palette.inputBackground) },
+                normal: { .backgroundColor(this.theme.palette.cardBackground) }
+              })
               .onClick(() => {
                 this.openDetail(item);
               })
@@ -233,6 +290,5 @@ export struct ExerciseLibraryPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 }

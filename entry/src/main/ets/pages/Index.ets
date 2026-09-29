@@ -51,6 +51,9 @@ import { ExerciseDetailParams, ExerciseLibraryPage } from './ExerciseLibrary';
 import { HistoryCalendar } from './HistoryCalendar';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { SectionCard } from '../components/SectionCard';
+import { BackgroundLayer } from '../components/BackgroundLayer';
+import { StatCard } from '../components/StatCard';
+import { GradientButton } from '../components/GradientButton';
 
 /** 规则设置滑杆参数（@Builder 按引用传参的对象字面量类型） */
 interface SliderSpec {
@@ -903,6 +906,15 @@ struct Index {
     return stats.totalDurationMin;
   }
 
+  /** 本周已消耗总热量（千卡） */
+  private weeklyCaloriesDone(): number {
+    if (this.historyStore === null) {
+      return 0;
+    }
+    const stats: PeriodStats = this.historyStore.getWeeklyStats();
+    return stats.totalCalories;
+  }
+
   /** 本周目标达成率（次数与时长取较低者，更保守） */
   private weeklyGoalRate(): number {
     if (this.goal.weeklySessions <= 0) {
@@ -1000,8 +1012,11 @@ struct Index {
   }
 
   build() {
-    // ===== 底部五栏 Tabs 导航（参考快练：首页/训练/计划/动作库/发现） =====
-    Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
+    // ===== 根布局：背景层（最底，固定不滚动）+ 底部五栏 Tabs 导航 =====
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      // ===== 底部五栏 Tabs 导航（参考快练：首页/训练/计划/动作库/发现） =====
+      Tabs({ barPosition: BarPosition.End, index: this.currentTab }) {
       TabContent() {
         this.homeTab()
       }
@@ -1030,7 +1045,6 @@ struct Index {
     .barBackgroundColor(this.theme.palette.cardBackground)
     .divider({ strokeWidth: 0.5, color: this.theme.palette.track })
     .animationDuration(200)
-    .backgroundColor(this.theme.palette.pageBackground)
     .onChange((index: number) => {
       this.currentTab = index;
       // 切回首页时重载画像/伤病/营养/肌群热力（替代原 onPageShow 的跨页刷新）
@@ -1045,6 +1059,9 @@ struct Index {
         this.discoverTick++;
       }
     })
+    }
+    .width('100%')
+    .height('100%')
   }
 
   /** 底部导航项（参考快练：选中项浅灰胶囊底 + 加粗标签，未选中灰色） */
@@ -1122,6 +1139,13 @@ struct Index {
           // 固定高度 120：内部柔光层用百分比填充时必须给 Stack 明确高度，
           // 否则在 Scroll 中百分比会按整个滚动视口解析把横幅撑满屏
           Stack() {
+            // Hero 底图（bg_hero 同系蓝渐变+跑道弧线，opacity 0.35 试值；叠在 linearGradient 之上、白字区保持干净）
+            Image(this.theme.mode === 'dark' ? $r('app.media.bg_hero_dark') : $r('app.media.bg_hero_light'))
+              .width('100%')
+              .height('100%')
+              .objectFit(ImageFit.Cover)
+              .opacity(0.35)
+              .accessibilityLevel('no')
             // 柔光层（accentGlow 径向渐变，装饰用；linearGradient/radialGradient 属性互斥，须用独立图层叠加）
             Row()
               .width('100%')
@@ -1132,6 +1156,42 @@ struct Index {
                 colors: SoftGlowUtil.getGlowColors(this.theme.palette.accentGlow ?? this.theme.palette.heroEnd)
               })
               .accessibilityLevel('no')
+            // 装饰圆斑（onHero 约 6% 透明，右上/左下各一，避开白字区）
+            Column() {
+              Circle({ width: 140, height: 140 })
+                .fill(this.theme.palette.onHero)
+                .opacity(0.06)
+                .translate({ x: 30, y: -70 })
+            }
+            .width('100%')
+            .height('100%')
+            .alignItems(HorizontalAlign.End)
+            .accessibilityLevel('no')
+            Column() {
+              Circle({ width: 90, height: 90 })
+                .fill(this.theme.palette.onHero)
+                .opacity(0.06)
+                .translate({ x: -30, y: 50 })
+            }
+            .width('100%')
+            .height('100%')
+            .alignItems(HorizontalAlign.Start)
+            .justifyContent(FlexAlign.End)
+            .accessibilityLevel('no')
+            // 右侧线性哑铃水印（onHero 8% 透明，避开文字区）
+            Column() {
+              Image($r('app.media.ic_training'))
+                .width(84)
+                .height(84)
+                .fillColor(this.theme.palette.onHero)
+                .opacity(0.08)
+                .translate({ x: -6, y: 8 })
+            }
+            .width('100%')
+            .height('100%')
+            .alignItems(HorizontalAlign.End)
+            .justifyContent(FlexAlign.End)
+            .accessibilityLevel('no')
             Column() {
             Row() {
               Column({ space: 4 }) {
@@ -1184,6 +1244,27 @@ struct Index {
           .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
           .margin({ bottom: 14 })
 
+          // ===== 本周汇总 StatCard 行：时长 / 消耗 / 频次（彩色锚点，错峰入场） =====
+          Row({ space: 10 }) {
+            StatCard({
+              theme: this.theme, label: '本周时长', value: `${this.weeklyDurationDone()}`,
+              unit: '分钟', iconRes: 'app.media.ic_duration', tone: 'blue', enterDelay: 0
+            })
+              .layoutWeight(1)
+            StatCard({
+              theme: this.theme, label: '本周消耗', value: `${this.weeklyCaloriesDone()}`,
+              unit: '千卡', iconRes: 'app.media.ic_calorie', tone: 'green', enterDelay: 40
+            })
+              .layoutWeight(1)
+            StatCard({
+              theme: this.theme, label: '本周频次', value: `${this.weeklySessionsDone()}`,
+              unit: '次', iconRes: 'app.media.ic_frequency', tone: 'orange', enterDelay: 80
+            })
+              .layoutWeight(1)
+          }
+          .width('100%')
+          .margin({ bottom: 14 })
+
           // ===== 今日准备度卡：环形进度（档位四色映射）+ 参与因子 + 过度训练三级预警徽章 =====
           if (this.bootLoading) {
             // 首屏骨架屏占位（600ms 呼吸占位后切换真实卡片）
@@ -1191,7 +1272,7 @@ struct Index {
           } else if (this.readiness !== null) {
             this.readinessCard({ report: this.readiness })
           } else {
-            SectionCard({ theme: this.theme, title: '今日准备度' }) {
+            SectionCard({ theme: this.theme, title: '今日准备度', iconRes: 'app.media.ic_recovery', accentTone: 'blue', enterDelay: 0 }) {
               Text('保存一次「每日状态」后，这里显示今日准备度与强度建议')
                 .fontSize(13)
                 .fontColor(this.theme.palette.secondaryText)
@@ -1238,7 +1319,7 @@ struct Index {
           .margin({ bottom: 14 })
 
           // ===== 用户画像卡片（未填写时引导；已填写显示摘要） =====
-          SectionCard({ theme: this.theme, title: '用户画像' }) {
+          SectionCard({ theme: this.theme, title: '用户画像', iconRes: 'app.media.ic_weight', accentTone: 'blue', enterDelay: 40 }) {
             if (this.profile.filled) {
               Text(`${this.profile.gender} · ${this.profile.age} 岁 · ${this.profile.weightKg} kg · ` +
                 `${this.profile.goal} · ${this.profile.experienceLevel}`)
@@ -1267,7 +1348,7 @@ struct Index {
           }
 
           // ===== 每日状态卡（睡眠/酸痛/饮水 + 准备度） =====
-          SectionCard({ theme: this.theme, title: '每日状态' }) {
+          SectionCard({ theme: this.theme, title: '每日状态', iconRes: 'app.media.ic_frequency', accentTone: 'orange', enterDelay: 80 }) {
             Row({ space: 10 }) {
               this.numberField('睡眠（小时）', this.sleepHoursText, (v: string) => {
                 this.sleepHoursText = v;
@@ -1354,7 +1435,7 @@ struct Index {
           }
 
           // ===== 本周目标进度环 =====
-          SectionCard({ theme: this.theme, title: '本周目标' }) {
+          SectionCard({ theme: this.theme, title: '本周目标', iconRes: 'app.media.ic_goal', accentTone: 'green', enterDelay: 120 }) {
             Row({ space: 16 }) {
               Stack() {
                 Progress({ value: this.weeklyGoalRate(), total: 100, type: ProgressType.Ring })
@@ -1393,7 +1474,7 @@ struct Index {
           }
 
           // ===== 本中周期进度卡：容量/强度双折线 + 减载周标记 + 已完成周实色 =====
-          SectionCard({ theme: this.theme, title: '本中周期进度', index: '02' }) {
+          SectionCard({ theme: this.theme, title: '本中周期进度', index: '02', iconRes: 'app.media.ic_plan', accentTone: 'orange' }) {
             if (this.mesoPlan !== null) {
               Text(`第 ${this.mesoWeek} / ${this.mesoPlan!.lengthWeeks} 周 · ${this.mesoPlan!.note}`)
                 .fontSize(12)
@@ -1426,7 +1507,7 @@ struct Index {
 
           // ===== 训练前后餐时机时间轴卡（2.2/2.3：画像已填时按训练日/非训练日切换） =====
           if (this.timingLines.length > 0) {
-            SectionCard({ theme: this.theme, title: '餐时机与碳水循环' }) {
+            SectionCard({ theme: this.theme, title: '餐时机与碳水循环', iconRes: 'app.media.ic_diet', accentTone: 'orange' }) {
               ForEach(this.timingLines, (line: string, idx: number) => {
                 Row({ space: 10 }) {
                   Column({ space: 3 }) {
@@ -1460,7 +1541,7 @@ struct Index {
           }
 
           // ===== 本周肌群容量热力（训练日志驱动，Canvas 人体色块） =====
-          SectionCard({ theme: this.theme, title: '本周肌群容量热力' }) {
+          SectionCard({ theme: this.theme, title: '本周肌群容量热力', iconRes: 'app.media.ic_frequency', accentTone: 'red' }) {
             if (this.heatTotal() === 0) {
               EmptyState({
                 theme: this.theme,
@@ -1545,7 +1626,7 @@ struct Index {
           }
 
           // ===== 历史与负荷趋势（首页卡） =====
-          SectionCard({ theme: this.theme, title: '历史与负荷趋势', index: '03' }) {
+          SectionCard({ theme: this.theme, title: '历史与负荷趋势', index: '03', iconRes: 'app.media.ic_duration', accentTone: 'blue' }) {
             if (this.history.length === 0) {
               EmptyState({ theme: this.theme, message: '暂无历史记录，完成一次分析后这里会展示负荷趋势' })
             } else {
@@ -1688,7 +1769,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 训练 Tab：运动数据录入 + 分析结果 + 力量训练日志入口 */
@@ -1736,7 +1816,7 @@ struct Index {
           }
 
           // ===== 数据录入卡片 =====
-          SectionCard({ theme: this.theme, title: '运动数据录入' }) {
+          SectionCard({ theme: this.theme, title: '运动数据录入', iconRes: 'app.media.ic_training', accentTone: 'blue' }) {
             // 运动类型下拉
             Text('运动类型')
               .fontSize(13)
@@ -1782,14 +1862,15 @@ struct Index {
             }
 
             Row({ space: 10 }) {
-              Button('开始分析')
-                .fontColor(this.theme.palette.onAccent)
-                .backgroundColor(this.theme.palette.accent)
-                .borderRadius(20)
-                .layoutWeight(1)
-                .onClick(() => {
+              // 主录入按钮：同色系渐变 + 按压回弹（onClick 逻辑不变）
+              GradientButton({
+                theme: this.theme,
+                buttonText: '开始分析',
+                onAction: () => {
                   this.runManualAnalysis();
-                })
+                }
+              })
+                .layoutWeight(1)
               Button('模拟数据')
                 .fontColor(this.theme.palette.accent)
                 .backgroundColor(this.theme.palette.inputBackground)
@@ -1823,7 +1904,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 计划 Tab：本周训练计划 + 引擎 V2 对比 + 规则设置 */
@@ -1852,7 +1932,7 @@ struct Index {
           if (this.report !== null) {
             this.planCards({ report: this.report })
           } else {
-            SectionCard({ theme: this.theme, title: '本周训练计划' }) {
+            SectionCard({ theme: this.theme, title: '本周训练计划', iconRes: 'app.media.ic_plan', accentTone: 'blue' }) {
               Column({ space: 10 }) {
                 Text('🗓️')
                   .fontSize(44)
@@ -1884,7 +1964,7 @@ struct Index {
           }
 
           // ===== 计划模板库（3.3：5 套内置模板，一键生成中周期） =====
-          SectionCard({ theme: this.theme, title: '计划模板库' }) {
+          SectionCard({ theme: this.theme, title: '计划模板库', iconRes: 'app.media.ic_plan', accentTone: 'orange' }) {
             ForEach(this.planTemplates, (template: PlanTemplate) => {
               Row({ space: 10 }) {
                 Column({ space: 3 }) {
@@ -2067,7 +2147,10 @@ struct Index {
                   .backgroundColor(!this.showV2 ? this.theme.palette.accent : this.theme.palette.inputBackground)
                   .accessibilityText('只展示 V1 引擎报告')
                   .onClick(() => {
-                    this.showV2 = false;
+                    // 引擎切换统一 200ms 过渡
+                    animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+                      this.showV2 = false;
+                    });
                   })
                 Text('V1·V2 对比')
                   .fontSize(12)
@@ -2078,7 +2161,9 @@ struct Index {
                   .backgroundColor(this.showV2 ? this.theme.palette.accent : this.theme.palette.inputBackground)
                   .accessibilityText('并列对比 V1 与 V2 引擎报告')
                   .onClick(() => {
-                    this.showV2 = true;
+                    animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+                      this.showV2 = true;
+                    });
                   })
               }
             }
@@ -2105,7 +2190,6 @@ struct Index {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 星期几文字（dateLabel 用） */
@@ -2174,7 +2258,7 @@ struct Index {
     .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 3 })
     .accessibilityText(label)
     .stateStyles({
-      pressed: { .scale({ x: 0.96, y: 0.96 }) },
+      pressed: { .scale({ x: 0.97, y: 0.97 }) },
       normal: { .scale({ x: 1.0, y: 1.0 }) }
     })
     .onClick(action)
@@ -2253,7 +2337,7 @@ struct Index {
   @Builder
   private planCards($$: ReportRef): void {
     // 扩展模块 本周训练计划（7 天周期，含休息日与强度轮换）
-    SectionCard({ theme: this.theme, title: '本周训练计划' }) {
+    SectionCard({ theme: this.theme, title: '本周训练计划', iconRes: 'app.media.ic_plan', accentTone: 'blue' }) {
       ForEach($$.report.weeklyPlan.days, (day: WeeklyPlanDay) => {
         Column() {
           Row({ space: 8 }) {
@@ -2418,7 +2502,7 @@ struct Index {
   /** 今日准备度卡内容：环形进度（档位四色）+ 参与因子 + 过度训练徽章（$$ 按引用传参） */
   @Builder
   private readinessCard($$: ReadinessRef): void {
-    SectionCard({ theme: this.theme, title: '今日准备度', index: '01' }) {
+    SectionCard({ theme: this.theme, title: '今日准备度', index: '01', iconRes: 'app.media.ic_recovery', accentTone: 'blue' }) {
       Row({ space: 16 }) {
         // 极简圆环（ProgressRing，stroke 6，档位四色映射）
         ProgressRing({
@@ -2564,7 +2648,7 @@ struct Index {
   @Builder
   private intakeCard(intake: MacroAchievement | null): void {
     if (intake !== null) {
-      SectionCard({ theme: this.theme, title: '今日营养达成' }) {
+      SectionCard({ theme: this.theme, title: '今日营养达成', iconRes: 'app.media.ic_diet', accentTone: 'green' }) {
         Row({ space: 16 }) {
           Stack() {
             Progress({ value: intake.overallPct, total: 100, type: ProgressType.Ring })

@@ -13,6 +13,8 @@ import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { SectionCard } from '../components/SectionCard';
 import { ProgressRing } from '../components/ProgressRing';
+import { BackgroundLayer } from '../components/BackgroundLayer';
+import { GradientButton } from '../components/GradientButton';
 import {
   ExerciseItem, ExerciseLibrary, EXERCISE_EQUIPMENTS, EXERCISE_MUSCLES
 } from '../data/ExerciseLibrary';
@@ -211,7 +213,10 @@ struct WorkoutLogPage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底，固定不滚动）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       // ===== 顶部栏 =====
       Row() {
         Button('‹ 返回')
@@ -300,7 +305,7 @@ struct WorkoutLogPage {
               .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
               .accessibilityText(`选择动作 ${item.name}`)
               .stateStyles({
-                pressed: { .scale({ x: 0.96, y: 0.96 }) },
+                pressed: { .scale({ x: 0.97, y: 0.97 }) },
                 normal: { .scale({ x: 1.0, y: 1.0 }) }
               })
               .onClick(() => {
@@ -319,9 +324,11 @@ struct WorkoutLogPage {
         this.setsPanel(this.selected)
       }
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 筛选条（器械行 / 部位行共用） */
@@ -359,6 +366,20 @@ struct WorkoutLogPage {
     return isEquipment ? this.selectedEquipment === option : this.selectedMuscle === option;
   }
 
+  /** 肌群 → 图标徽章色调（胸蓝/背绿/腿橙/肩红，其余蓝） */
+  private muscleTone(muscle: string): string {
+    if (muscle === '背') {
+      return 'green';
+    }
+    if (muscle === '腿') {
+      return 'orange';
+    }
+    if (muscle === '肩') {
+      return 'red';
+    }
+    return 'blue';
+  }
+
   /** 难度文案 → 圆点数（初级 1 / 中级 2 / 高级 3，未知按 1） */
   private difficultyDots(difficulty: string): number {
     if (difficulty === '高级') {
@@ -376,7 +397,7 @@ struct WorkoutLogPage {
     if (exercise !== null) {
       Scroll() {
         Column() {
-          SectionCard({ theme: this.theme, title: exercise.name }) {
+          SectionCard({ theme: this.theme, title: exercise.name, iconRes: 'app.media.ic_training', accentTone: this.muscleTone(exercise.muscle) }) {
             Text(`${exercise.equipment} · ${exercise.muscle}·${exercise.subMuscle} · ${exercise.difficulty}`)
               .fontSize(12)
               .fontColor(this.theme.palette.secondaryText)
@@ -479,25 +500,15 @@ struct WorkoutLogPage {
                 .onClick(() => {
                   this.addSet();
                 })
-              Button('保存本次训练')
-                .fontSize(14)
-                .fontColor(this.theme.palette.onAccent)
-                .backgroundColor(this.theme.palette.accent)
-                .borderRadius(18)
-                .height(36)
-                .layoutWeight(1)
-                .stateStyles({
-                  pressed: {
-                    .scale({ x: 0.96, y: 0.96 })
-                  },
-                  normal: {
-                    .scale({ x: 1.0, y: 1.0 })
-                  }
-                })
-                .accessibilityText('校验并保存训练日志')
-                .onClick(() => {
+              GradientButton({
+                theme: this.theme,
+                buttonText: '保存本次训练',
+                onAction: () => {
                   this.saveLog();
-                })
+                }
+              })
+                .layoutWeight(1)
+                .accessibilityText('校验并保存训练日志')
             }
             .width('100%')
             .margin({ top: 14 })
@@ -512,8 +523,8 @@ struct WorkoutLogPage {
                 total: this.restTotal <= 0 ? 1 : this.restTotal,
                 diameter: 76,
                 ringColor: this.restFlash ? this.theme.palette.danger :
-                  (this.restLeft <= 10 && this.restRunning ? this.theme.palette.warning :
-                    this.theme.palette.accent),
+                  (this.restLeft <= 10 && this.restRunning ? this.theme.palette.warning : ''),
+                gradientRing: true,
                 centerText: this.restText(),
                 caption: '休息'
               })

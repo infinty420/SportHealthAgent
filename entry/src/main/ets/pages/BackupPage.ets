@@ -9,6 +9,8 @@ import { promptAction, router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { SectionCard } from '../components/SectionCard';
+import { BackgroundLayer } from '../components/BackgroundLayer';
+import { IconBadge } from '../components/IconBadge';
 import { BackupService } from '../data/BackupService';
 
 @Entry
@@ -67,7 +69,10 @@ struct BackupPage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底，固定不滚动）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       // 顶部栏：返回 + 标题
       Row() {
         Button('← 返回')
@@ -98,18 +103,38 @@ struct BackupPage {
             .fontSize(13)
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(19)
-          Button('导出全量备份')
-            .fontSize(14)
-            .fontColor(this.theme.palette.onAccent)
-            .backgroundColor(this.theme.palette.accent)
-            .borderRadius(20)
-            .width('100%')
-            .height(40)
-            .margin({ top: 12 })
-            .accessibilityText('导出全部数据到沙箱文件')
-            .onClick(() => {
-              this.doExport();
-            })
+          Row({ space: 12 }) {
+            IconBadge({ theme: this.theme, iconRes: 'app.media.ic_export', tone: 'blue', badgeSize: 40 })
+            Column({ space: 2 }) {
+              Text('导出全量备份')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.theme.palette.primaryText)
+              Text('生成单文件到应用沙箱')
+                .fontSize(11)
+                .fontColor(this.theme.palette.secondaryText)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text('›')
+              .fontSize(18)
+              .fontColor(this.theme.palette.secondaryText)
+              .accessibilityLevel('no')
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .padding(12)
+          .margin({ top: 12 })
+          .borderRadius(16)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .stateStyles({
+            pressed: { .scale({ x: 0.97, y: 0.97 }) },
+            normal: { .scale({ x: 1.0, y: 1.0 }) }
+          })
+          .accessibilityText('导出全部数据到沙箱文件')
+          .onClick(() => {
+            this.doExport();
+          })
           if (this.lastExportPath.length > 0) {
             Text(this.lastExportPath)
               .fontSize(11)
@@ -123,19 +148,41 @@ struct BackupPage {
             .fontSize(13)
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(19)
-          Button('从备份文件恢复')
-            .fontSize(14)
-            .fontColor(this.hasBackup ? this.theme.palette.onAccent : this.theme.palette.secondaryText)
-            .backgroundColor(this.hasBackup ? this.theme.palette.danger : this.theme.palette.inputBackground)
-            .borderRadius(20)
-            .width('100%')
-            .height(40)
-            .margin({ top: 12 })
-            .enabled(this.hasBackup)
-            .accessibilityText('从备份文件覆盖恢复全部数据')
-            .onClick(() => {
+          Row({ space: 12 }) {
+            IconBadge({ theme: this.theme, iconRes: 'app.media.ic_import', tone: 'red', badgeSize: 40 })
+            Column({ space: 2 }) {
+              Text('从备份文件恢复')
+                .fontSize(14)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.hasBackup ? this.theme.palette.primaryText : this.theme.palette.secondaryText)
+              Text('覆盖当前全部本地数据，恢复前会二次确认')
+                .fontSize(11)
+                .fontColor(this.theme.palette.secondaryText)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            Text('›')
+              .fontSize(18)
+              .fontColor(this.theme.palette.secondaryText)
+              .accessibilityLevel('no')
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .padding(12)
+          .margin({ top: 12 })
+          .borderRadius(16)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .opacity(this.hasBackup ? 1 : 0.5)
+          .stateStyles({
+            pressed: { .scale({ x: 0.97, y: 0.97 }) },
+            normal: { .scale({ x: 1.0, y: 1.0 }) }
+          })
+          .accessibilityText('从备份文件覆盖恢复全部数据')
+          .onClick(() => {
+            if (this.hasBackup) {
               this.confirmRestore();
-            })
+            }
+          })
         }
 
         if (this.statusText.length > 0) {
@@ -150,8 +197,10 @@ struct BackupPage {
       .padding({ left: 16, right: 16 })
       .layoutWeight(1)
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 }

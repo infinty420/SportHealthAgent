@@ -10,6 +10,8 @@ import { ThemeManager } from '../theme/ThemeManager';
 import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
 import { ExerciseDetailParams } from './ExerciseLibrary';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { BackgroundLayer } from '../components/BackgroundLayer';
+import { IconBadge } from '../components/IconBadge';
 
 @Entry
 @Component
@@ -109,7 +111,10 @@ struct ExerciseDetailPage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底，固定不滚动）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       // ===== 顶部栏 =====
       Row() {
         Button('‹ 返回')
@@ -141,9 +146,11 @@ struct ExerciseDetailPage {
         this.detailBody(this.exercise)
       }
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 详情主体（参数局部收窄，规避 ArkTS 对 this 成员不做智能收窄的限制） */
@@ -157,6 +164,33 @@ struct ExerciseDetailPage {
             .width('100%')
             .aspectRatio(1)
             .borderRadius(24)
+
+          // 信息条：时长 / 器械 / 难度（IconBadge + 文字横排）
+          Row({ space: 14 }) {
+            Row({ space: 6 }) {
+              IconBadge({ theme: this.theme, iconRes: 'app.media.ic_duration', tone: 'blue', badgeSize: 28 })
+              Text(exercise.prescription)
+                .fontSize(12)
+                .fontColor(this.theme.palette.secondaryText)
+                .maxLines(1)
+            }
+            .alignItems(VerticalAlign.Center)
+            Row({ space: 6 }) {
+              IconBadge({ theme: this.theme, iconRes: 'app.media.ic_training', tone: 'green', badgeSize: 28 })
+              Text(exercise.equipment)
+                .fontSize(12)
+                .fontColor(this.theme.palette.secondaryText)
+            }
+            .alignItems(VerticalAlign.Center)
+            Row({ space: 6 }) {
+              IconBadge({ theme: this.theme, iconRes: 'app.media.ic_goal', tone: 'orange', badgeSize: 28 })
+              Text(exercise.difficulty)
+                .fontSize(12)
+                .fontColor(this.theme.palette.secondaryText)
+            }
+            .alignItems(VerticalAlign.Center)
+          }
+          .margin({ top: 10 })
 
           // 动作名称
           Text(exercise.name)
@@ -243,12 +277,13 @@ struct ExerciseDetailPage {
             Row({ space: 8 }) {
               Text(`${index + 1}`)
                 .fontSize(12)
-                .fontColor(this.theme.palette.onAccent)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.theme.palette.accent)
                 .textAlign(TextAlign.Center)
                 .width(20)
                 .height(20)
                 .borderRadius(10)
-                .backgroundColor(this.theme.palette.accent)
+                .backgroundColor(this.theme.palette.accentSoft)
               Text(point)
                 .fontSize(14)
                 .fontColor(this.theme.palette.primaryText)

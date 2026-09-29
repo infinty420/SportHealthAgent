@@ -13,6 +13,7 @@ import { common } from '@kit.AbilityKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { HeatColorUtil } from '../utils/HeatColorUtil';
+import { ChartStyleUtil } from '../utils/ChartStyleUtil';
 import { BodyPathData } from '../data/BodyPathData';
 import { SectionCard } from '../components/SectionCard';
 import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
@@ -600,6 +601,19 @@ export struct HistoryCalendar {
     ctx.fillText('总组数', cx, cy + 26);
   }
 
+  /** 绘制圆顶柱条（顶角两弧，仅用项目已验证的 arc/lineTo 路径） */
+  private fillRoundTopBar(ctx: CanvasRenderingContext2D, x: number, baseY: number, w: number, h: number, r: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x, baseY - h + r);
+    ctx.arc(x + r, baseY - h + r, r, Math.PI, Math.PI * 1.5);
+    ctx.lineTo(x + w - r, baseY - h);
+    ctx.arc(x + w - r, baseY - h + r, r, Math.PI * 1.5, Math.PI * 2);
+    ctx.lineTo(x + w, baseY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   /** 绘制训练时长对比双柱（左：上一周期，右：本周期） */
   private drawDuration(): void {
     const ctx: CanvasRenderingContext2D = this.durCtx;
@@ -609,12 +623,17 @@ export struct HistoryCalendar {
     const maxH: number = 88;
     const prevH: number = maxVal > 0 ? Math.max(4, this.durPrev / maxVal * maxH) : 4;
     const curH: number = maxVal > 0 ? Math.max(4, this.durCurrent / maxVal * maxH) : 4;
-    // 上一周期柱
-    ctx.fillStyle = this.theme.palette.track;
-    ctx.fillRect(60, baseY - prevH, 70, prevH);
-    // 本周期柱
-    ctx.fillStyle = this.theme.palette.accent;
-    ctx.fillRect(190, baseY - curH, 70, curH);
+    const barR: number = ChartStyleUtil.barCornerRadius();
+    // 上一周期柱（圆顶，轨道色）
+    ctx.fillStyle = ChartStyleUtil.prevBarColor(this.theme);
+    this.fillRoundTopBar(ctx, 60, baseY, 70, prevH, barR);
+    // 本周期柱（圆顶，accentStart→accentEnd 同色系渐变）
+    const barGrad: CanvasGradient = ctx.createLinearGradient(0, baseY - curH, 0, baseY);
+    const barCols: string[] = ChartStyleUtil.barGradientColors(this.theme);
+    barGrad.addColorStop(0, barCols[0]);
+    barGrad.addColorStop(1, barCols[1]);
+    ctx.fillStyle = barGrad;
+    this.fillRoundTopBar(ctx, 190, baseY, 70, curH, barR);
     // 数值
     ctx.fillStyle = this.theme.palette.secondaryText;
     ctx.font = this.canvasFont(13, false);
@@ -623,7 +642,7 @@ export struct HistoryCalendar {
     ctx.fillStyle = this.theme.palette.accent;
     ctx.fillText(`${this.durCurrent} 分钟`, 225, baseY - curH - 8);
     // 轴与标签
-    ctx.fillStyle = this.theme.palette.track;
+    ctx.fillStyle = ChartStyleUtil.gridLineColor(this.theme);
     ctx.fillRect(20, baseY, 280, 1);
     ctx.fillStyle = this.theme.palette.secondaryText;
     ctx.fillText('上一周期', 95, baseY + 20);
@@ -1039,7 +1058,6 @@ export struct HistoryCalendar {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 热力图图例小色块 */

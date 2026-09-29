@@ -11,6 +11,7 @@ import { router } from '@kit.ArkUI';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { SectionCard } from '../components/SectionCard';
+import { BackgroundLayer } from '../components/BackgroundLayer';
 import { LoadBadge } from '../components/LoadBadge';
 import { MacroBar } from '../components/MacroBar';
 import { AnalysisReport } from '../agent/AnalysisResult';
@@ -47,7 +48,10 @@ struct AnalysisResultPage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       // ===== 顶部栏 =====
       Row() {
         Button('‹ 返回')
@@ -95,16 +99,18 @@ struct AnalysisResultPage {
       .layoutWeight(1)
       .scrollBar(BarState.Off)
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 分析结果卡片组：模块①评估 + 模块②饮食 + 模块③互补规划 */
   @Builder
   private resultCards($$: ReportRef): void {
     // 模块① 本次训练评估
-    SectionCard({ theme: this.theme, title: '模块① 本次训练评估' }) {
+    SectionCard({ theme: this.theme, title: '模块① 本次训练评估', iconRes: 'app.media.ic_training', accentTone: 'blue' }) {
       LoadBadge({
         theme: this.theme,
         status: $$.report.assessment.loadStatus,
@@ -147,7 +153,7 @@ struct AnalysisResultPage {
     }
 
     // 模块② 饮食方案（Keep 风格：宏量占比条 + 带图食物卡片）
-    SectionCard({ theme: this.theme, title: '模块② 饮食方案' }) {
+    SectionCard({ theme: this.theme, title: '模块② 饮食方案', iconRes: 'app.media.ic_diet', accentTone: 'orange' }) {
       Text(`建议补充热量 ${$$.report.diet.totalCalories} 千卡`)
         .fontSize(14)
         .fontWeight(FontWeight.Medium)
@@ -185,7 +191,7 @@ struct AnalysisResultPage {
     }
 
     // 模块③ 下一次互补训练规划
-    SectionCard({ theme: this.theme, title: '模块③ 下一次互补训练规划' }) {
+    SectionCard({ theme: this.theme, title: '模块③ 下一次互补训练规划', iconRes: 'app.media.ic_plan', accentTone: 'green' }) {
       Text($$.report.nextWorkout.workoutType)
         .fontSize(17)
         .fontWeight(FontWeight.Bold)

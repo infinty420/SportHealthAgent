@@ -31,6 +31,10 @@ import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/Muscl
 import { UserProfileStore } from '../data/UserProfileStore';
 import { UserProfile } from '../model/UserProfile';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { BackgroundLayer } from '../components/BackgroundLayer';
+import { StatCard } from '../components/StatCard';
+import { IconBadge } from '../components/IconBadge';
+import { ChartStyleUtil } from '../utils/ChartStyleUtil';
 import { SectionCard } from '../components/SectionCard';
 import { SoftGlowUtil } from '../utils/SoftGlowUtil';
 
@@ -94,6 +98,8 @@ struct ReportPage {
   private wellnessStore: WellnessLogStore | null = null;
   private workoutStore: WorkoutLogStore | null = null;
   private profileStore: UserProfileStore | null = null;
+  /** 周目标达成率渐变环画布上下文 */
+  private goalRingCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
 
   aboutToAppear(): void {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
@@ -481,6 +487,34 @@ struct ReportPage {
     return streak;
   }
 
+  /** 周目标达成率渐变环：轨道整环 + accentStart→accentEnd 渐变弧（圆头） */
+  private drawGoalRing(): void {
+    const ctx: CanvasRenderingContext2D = this.goalRingCtx;
+    ctx.clearRect(0, 0, 120, 120);
+    const cx: number = 60;
+    const cy: number = 60;
+    const r: number = 50;
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    // 轨道整环
+    ctx.strokeStyle = this.theme.palette.track;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // 渐变进度弧（从正上方起，顺时针）
+    const rate: number = this.goalRate();
+    if (rate > 0) {
+      const cols: string[] = ChartStyleUtil.ringGradientColors(this.theme);
+      const grad: CanvasGradient = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+      grad.addColorStop(0, cols[0]);
+      grad.addColorStop(1, cols[1]);
+      ctx.strokeStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(rate, 100) / 100);
+      ctx.stroke();
+    }
+  }
+
   /** 周目标达成率（%，仅周视图有意义；次数与时长取较低者更保守） */
   private goalRate(): number {
     if (this.goal.weeklySessions <= 0) {
@@ -567,7 +601,10 @@ struct ReportPage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底，固定不滚动）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       // ===== 顶部栏 =====
       Row() {
         Button('‹ 返回')
@@ -626,13 +663,29 @@ struct ReportPage {
               .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
               .width('100%')
             Row({ space: 10 }) {
-              this.statCard($r('app.string.report_sessions'), `${this.stats.sessions}`)
-              this.statCard($r('app.string.report_avg_load'), `${this.stats.avgLoad}`)
+              StatCard({
+                theme: this.theme, label: $r('app.string.report_sessions'), value: `${this.stats.sessions}`,
+                unit: '次', iconRes: 'app.media.ic_frequency', tone: 'blue'
+              })
+                .layoutWeight(1)
+              StatCard({
+                theme: this.theme, label: $r('app.string.report_avg_load'), value: `${this.stats.avgLoad}`,
+                unit: '', iconRes: 'app.media.ic_training', tone: 'orange', enterDelay: 40
+              })
+                .layoutWeight(1)
             }
             .width('100%')
             Row({ space: 10 }) {
-              this.statCard($r('app.string.report_duration'), `${this.stats.totalDurationMin}`)
-              this.statCard($r('app.string.report_calories'), `${this.stats.totalCalories}`)
+              StatCard({
+                theme: this.theme, label: $r('app.string.report_duration'), value: `${this.stats.totalDurationMin}`,
+                unit: '分钟', iconRes: 'app.media.ic_duration', tone: 'blue', enterDelay: 80
+              })
+                .layoutWeight(1)
+              StatCard({
+                theme: this.theme, label: $r('app.string.report_calories'), value: `${this.stats.totalCalories}`,
+                unit: '千卡', iconRes: 'app.media.ic_calorie', tone: 'green', enterDelay: 120
+              })
+                .layoutWeight(1)
             }
             .width('100%')
 
@@ -643,11 +696,15 @@ struct ReportPage {
                   .fontSize(14)
                   .fontColor(this.theme.palette.secondaryText)
                 Stack() {
-                  Progress({ value: this.goalRate(), total: 100, type: ProgressType.Ring })
+                  // 渐变描边环（accentStart→accentEnd 同色系，Canvas 绘制；key 带主题与数值触发重绘）
+                  Canvas(this.goalRingCtx)
                     .width(120)
                     .height(120)
-                    .color(this.theme.palette.accent)
-                    .backgroundColor(this.theme.palette.track)
+                    .key(`goalring-${this.theme.mode}-${this.goalRate()}`)
+                    .accessibilityLevel('no')
+                    .onReady(() => {
+                      this.drawGoalRing();
+                    })
                   Text(`${this.goalRate()}%`)
                     .fontSize(24)
                     .fontWeight(FontWeight.Bold)
@@ -681,9 +738,11 @@ struct ReportPage {
       .layoutWeight(1)
       .scrollBar(BarState.Off)
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   /** 训练日历 × 个人纪录合并卡：月历标年月日、按次数着色，点日期在下方看当日记录与当日 PR */
@@ -791,7 +850,8 @@ struct ReportPage {
           // PR 榜：accentGlow 柔光底 + 大数字成绩
           Column() {
             ForEach(this.prList.slice(0, 8), (pr: ExercisePR) => {
-              Row() {
+              Row({ space: 10 }) {
+                IconBadge({ theme: this.theme, iconRes: 'app.media.ic_pr', tone: 'green', badgeSize: 32 })
                 Text(pr.exerciseName)
                   .fontSize(13)
                   .fontColor(this.theme.palette.primaryText)
@@ -1149,41 +1209,43 @@ struct ReportPage {
 
   @Builder
   private periodTab(label: string | Resource, weekly: boolean): void {
-    Text(label)
-      .fontSize(14)
-      .fontColor(this.isWeekly === weekly ? this.theme.palette.onAccent : this.theme.palette.primaryText)
-      .textAlign(TextAlign.Center)
-      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-      .borderRadius(18)
-      .backgroundColor(this.isWeekly === weekly ?
-        this.theme.palette.accent : this.theme.palette.inputBackground)
-      .onClick(() => {
-        this.isWeekly = weekly;
-        this.refresh();
-      })
+    if (this.isWeekly === weekly) {
+      Text(label)
+        .fontSize(14)
+        .fontColor(this.theme.palette.onAccent)
+        .textAlign(TextAlign.Center)
+        .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+        .borderRadius(18)
+        .linearGradient({
+          angle: 90,
+          colors: [
+            [this.theme.palette.accentStart ?? this.theme.palette.accent, 0.0],
+            [this.theme.palette.accentEnd ?? this.theme.palette.accent, 1.0]
+          ]
+        })
+        .onClick(() => {
+          // 周/月切换统一 200ms 过渡
+          animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+            this.isWeekly = weekly;
+            this.refresh();
+          });
+        })
+    } else {
+      Text(label)
+        .fontSize(14)
+        .fontColor(this.theme.palette.primaryText)
+        .textAlign(TextAlign.Center)
+        .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+        .borderRadius(18)
+        .backgroundColor(this.theme.palette.inputBackground)
+        .onClick(() => {
+          // 周/月切换统一 200ms 过渡
+          animateTo({ duration: 200, curve: Curve.EaseOut }, () => {
+            this.isWeekly = weekly;
+            this.refresh();
+          });
+        })
+    }
   }
 
-  @Builder
-  private statCard(label: string | Resource, value: string): void {
-    Column({ space: 6 }) {
-      Text(value)
-        .fontSize(26)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(this.theme.palette.ink ?? this.theme.palette.accent)
-      Text(label)
-        .fontSize(12)
-        .fontColor(this.theme.palette.secondaryText)
-    }
-    .alignItems(HorizontalAlign.Center)
-    .padding(16)
-    .borderRadius(20)
-    .backgroundColor(this.theme.palette.cardBackground)
-    .radialGradient({
-      center: ['50%', '0%'],
-      radius: 160,
-      colors: SoftGlowUtil.getGlowColors(this.theme.palette.accentGlow ?? this.theme.palette.cardBackground)
-    })
-    .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
-    .layoutWeight(1)
-  }
 }

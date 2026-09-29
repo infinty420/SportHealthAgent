@@ -5,6 +5,7 @@
  */
 import { ThemeManager } from '../theme/ThemeManager';
 import { Typography } from '../utils/Typography';
+import { ChartStyleUtil } from '../utils/ChartStyleUtil';
 
 /** 极简圆环进度：环形进度 + 中心数值与说明 */
 @Component
@@ -22,8 +23,12 @@ export struct ProgressRing {
   @Prop diameter: number = 84;
   /** 可选环色（空串 = accent；用于准备度档位四色映射） */
   @Prop ringColor: string = '';
+  /** 可选渐变描边（accentStart→accentEnd 同色系 Canvas 绘制；ringColor 优先） */
+  @Prop gradientRing: boolean = false;
   /** 滚动显示的数值（-1 = 未滚动，直接显示真实值） */
   @State private shownValue: number = -1;
+  /** 渐变环画布上下文（仅 gradientRing=true 时使用） */
+  private ringCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
 
   /** 数字滚动：400ms ease-out 从 0 滚到目标值（仅纯数字模式） */
   private rollTo(target: number): void {
@@ -41,12 +46,24 @@ export struct ProgressRing {
 
   build() {
     Stack() {
-      Progress({ value: this.value, total: this.total, type: ProgressType.Ring })
-        .width(this.diameter)
-        .height(this.diameter)
-        .color(this.ringColor.length > 0 ? this.ringColor : this.theme.palette.accent)
-        .backgroundColor(this.theme.palette.track)
-        .style({ strokeWidth: 6 })
+      if (this.gradientRing && this.ringColor.length === 0) {
+        // 渐变描边环（accentStart→accentEnd 同色系；key 带主题与数值触发重绘）
+        Canvas(this.ringCtx)
+          .width(this.diameter)
+          .height(this.diameter)
+          .key(`pring-${this.theme.mode}-${Math.round(this.value)}-${this.diameter}`)
+          .accessibilityLevel('no')
+          .onReady(() => {
+            this.drawGradientRing();
+          })
+      } else {
+        Progress({ value: this.value, total: this.total, type: ProgressType.Ring })
+          .width(this.diameter)
+          .height(this.diameter)
+          .color(this.ringColor.length > 0 ? this.ringColor : this.theme.palette.accent)
+          .backgroundColor(this.theme.palette.track)
+          .style({ strokeWidth: 6 })
+      }
       Column({ space: 0 }) {
         Text(this.centerText.length > 0 ? this.centerText :
           `${this.shownValue < 0 ? Math.round(this.value) : this.shownValue}`)
@@ -68,5 +85,32 @@ export struct ProgressRing {
         this.rollTo(this.value);
       }
     })
+  }
+
+  /** 渐变描边环绘制：轨道整环 + accentStart→accentEnd 渐变弧（圆头） */
+  private drawGradientRing(): void {
+    const ctx: CanvasRenderingContext2D = this.ringCtx;
+    const d: number = this.diameter;
+    ctx.clearRect(0, 0, d, d);
+    const cx: number = d / 2;
+    const cy: number = d / 2;
+    const r: number = d / 2 - 5;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = this.theme.palette.track;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    const ratio: number = this.total > 0 ? Math.min(1, this.value / this.total) : 0;
+    if (ratio > 0) {
+      const cols: string[] = ChartStyleUtil.ringGradientColors(this.theme);
+      const grad: CanvasGradient = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+      grad.addColorStop(0, cols[0]);
+      grad.addColorStop(1, cols[1]);
+      ctx.strokeStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ratio);
+      ctx.stroke();
+    }
   }
 }

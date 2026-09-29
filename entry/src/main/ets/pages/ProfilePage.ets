@@ -16,6 +16,7 @@ import { BodyMetricsStore, BodyMetricEntry } from '../data/BodyMetricsStore';
 import { GoalStore, TrainingGoal } from '../data/GoalStore';
 import { HistoryStore, PeriodStats } from '../data/HistoryStore';
 import { ProgressRing } from '../components/ProgressRing';
+import { BackgroundLayer } from '../components/BackgroundLayer';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 @Entry
@@ -134,7 +135,10 @@ struct ProfilePage {
   }
 
   build() {
-    Column() {
+    // 根布局：背景层（最底，固定不滚动）+ 原内容列
+    Stack() {
+      BackgroundLayer({ theme: this.theme })
+      Column() {
       Row() {
         Button('‹ 返回')
           .fontSize(14)
@@ -159,8 +163,20 @@ struct ProfilePage {
 
       Scroll() {
         Column() {
-          // ===== 画像摘要卡：圆形头像（accent 渐变描边）+ 信息 + 周目标 ProgressRing =====
-          Row({ space: 16 }) {
+          // ===== 画像摘要卡：顶部渐变条 + 圆形头像（accent 渐变描边）+ 信息 + 周目标 ProgressRing =====
+          Column() {
+            Row()
+              .width('100%')
+              .height(4)
+              .linearGradient({
+                angle: 0,
+                colors: [
+                  [this.theme.palette.accentStart ?? this.theme.palette.accent, 0.0],
+                  [this.theme.palette.accentEnd ?? this.theme.palette.accent, 1.0]
+                ]
+              })
+              .accessibilityLevel('no')
+            Row({ space: 16 }) {
             // 渐变描边圆形头像框
             Stack() {
               Circle({ width: 72, height: 72 })
@@ -198,10 +214,13 @@ struct ProfilePage {
               caption: '本周目标'
             })
           }
+            .width('100%')
+            .padding(16)
+          }
           .width('100%')
-          .padding(16)
           .borderRadius(20)
-          .backgroundColor(this.theme.palette.cardBackground)
+          .clip(true)
+          .backgroundColor(this.theme.palette.cardElevated ?? this.theme.palette.cardBackground)
           .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
           .margin({ bottom: 14 })
 
@@ -216,13 +235,13 @@ struct ProfilePage {
           })
           this.numberField('体重（公斤）', this.weightText, (v: string) => {
             this.weightText = v;
-          })
+          }, 'app.media.ic_weight')
           this.numberField('静息心率（次/分）', this.restingHrText, (v: string) => {
             this.restingHrText = v;
-          })
+          }, 'app.media.ic_frequency')
           this.selectRow('训练目标', USER_GOAL_LIST, this.goal, (v: string) => {
             this.goal = v;
-          })
+          }, 'app.media.ic_goal')
           this.selectRow('经验等级', EXPERIENCE_LEVEL_LIST, this.level, (v: string) => {
             this.level = v;
           })
@@ -326,17 +345,28 @@ struct ProfilePage {
       .layoutWeight(1)
       .scrollBar(BarState.Off)
     }
+      .width('100%')
+      .height('100%')
+    }
     .width('100%')
     .height('100%')
-    .backgroundColor(this.theme.palette.pageBackground)
   }
 
   @Builder
-  private selectRow(label: string, options: string[], current: string, onPick: (v: string) => void): void {
+  private selectRow(label: string, options: string[], current: string, onPick: (v: string) => void, iconRes: string = ''): void {
     Column({ space: 4 }) {
-      Text(label)
-        .fontSize(13)
-        .fontColor(this.theme.palette.secondaryText)
+      Row({ space: 6 }) {
+        if (iconRes.length > 0) {
+          Image($r(iconRes))
+            .width(14)
+            .height(14)
+            .fillColor(this.theme.palette.accent)
+            .accessibilityLevel('no')
+        }
+        Text(label)
+          .fontSize(13)
+          .fontColor(this.theme.palette.secondaryText)
+      }
       Select(this.toOptions(options))
         .value(current)
         .fontColor(this.theme.palette.primaryText)
@@ -357,11 +387,20 @@ struct ProfilePage {
   }
 
   @Builder
-  private numberField(label: string, value: string, onChange: (v: string) => void): void {
+  private numberField(label: string, value: string, onChange: (v: string) => void, iconRes: string = ''): void {
     Column({ space: 4 }) {
-      Text(label)
-        .fontSize(13)
-        .fontColor(this.theme.palette.secondaryText)
+      Row({ space: 6 }) {
+        if (iconRes.length > 0) {
+          Image($r(iconRes))
+            .width(14)
+            .height(14)
+            .fillColor(this.theme.palette.accent)
+            .accessibilityLevel('no')
+        }
+        Text(label)
+          .fontSize(13)
+          .fontColor(this.theme.palette.secondaryText)
+      }
       TextInput({ text: value })
         .type(InputType.Number)
         .fontColor(this.theme.palette.primaryText)

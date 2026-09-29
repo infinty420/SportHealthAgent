@@ -21,6 +21,8 @@ export struct SectionCard {
   @Prop iconRes: string = '';
   /** 图标徽章色调：blue / green / orange / red */
   @Prop accentTone: string = 'blue';
+  /** 入场错峰延迟（ms），默认 0；仅首屏前几张卡片传入 */
+  @Prop enterDelay: number = 0;
   /** 卡片内容插槽 */
   @BuilderParam content: () => void;
   /** 入场动效标记：onAppear 后 250ms 淡入上滑 */
@@ -66,10 +68,13 @@ export struct SectionCard {
     .opacity(this.entered ? 1 : 0)
     .translate({ x: 0, y: this.entered ? 0 : 16 })
     .onAppear(() => {
-      // 入场：250ms ease 淡入上滑
-      animateTo({ duration: 250, curve: Curve.EaseOut }, () => {
-        this.entered = true;
-      });
+      // 入场：250ms ease 淡入上滑（可选错峰延迟，仅首屏前几张传入）
+      const timerId: number = setTimeout(() => {
+        animateTo({ duration: 250, curve: Curve.EaseOut }, () => {
+          this.entered = true;
+        });
+        clearTimeout(timerId);
+      }, this.enterDelay);
     })
   }
 }
