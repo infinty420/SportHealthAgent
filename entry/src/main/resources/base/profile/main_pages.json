@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
+    "pages/AnalysisResultPage",
     "pages/ExerciseDetail",
     "pages/FoodPicker",
     "pages/Report",
