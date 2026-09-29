@@ -32,6 +32,7 @@ import { UserProfileStore } from '../data/UserProfileStore';
 import { UserProfile } from '../model/UserProfile';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { SectionCard } from '../components/SectionCard';
+import { SoftGlowUtil } from '../utils/SoftGlowUtil';
 
 /** 月日历格子（训练日历与个人纪录合并卡用） */
 interface ReportCalCell {
@@ -617,6 +618,11 @@ struct ReportPage {
               .margin({ top: 40 })
           } else {
             // ===== 统计卡片 =====
+            Text(this.isWeekly ? '本周训练' : '近 30 天训练')
+              .fontSize(16)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
+              .width('100%')
             Row({ space: 10 }) {
               this.statCard($r('app.string.report_sessions'), `${this.stats.sessions}`)
               this.statCard($r('app.string.report_avg_load'), `${this.stats.avgLoad}`)
@@ -741,7 +747,7 @@ struct ReportPage {
               .textAlign(TextAlign.Center)
               .width('100%')
               .height(36)
-              .borderRadius(8)
+              .borderRadius(4)
               .backgroundColor(cell.inMonth ? this.cellColor(cell.count) : this.theme.palette.cardBackground)
               .borderWidth(cell.selected ? 2 : 0)
               .borderColor(this.theme.palette.primaryText)
@@ -780,30 +786,38 @@ struct ReportPage {
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(18)
         } else {
-          ForEach(this.prList.slice(0, 8), (pr: ExercisePR) => {
-            Row() {
-              Text(pr.exerciseName)
-                .fontSize(13)
-                .fontColor(this.theme.palette.primaryText)
-                .layoutWeight(1)
-              Text(pr.maxWeightKg > 0 ?
-                `${pr.maxWeightKg}kg · 1RM≈${pr.bestOneRepMax}kg` : `${pr.bestTotalReps} 次`)
-                .fontSize(13)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(this.theme.palette.accent)
-              Text(` · ${pr.sessions} 次`)
+          // PR 榜：accentGlow 柔光底 + 大数字成绩
+          Column() {
+            ForEach(this.prList.slice(0, 8), (pr: ExercisePR) => {
+              Row() {
+                Text(pr.exerciseName)
+                  .fontSize(13)
+                  .fontColor(this.theme.palette.primaryText)
+                  .layoutWeight(1)
+                Text(pr.maxWeightKg > 0 ?
+                  `${pr.maxWeightKg}kg · 1RM≈${pr.bestOneRepMax}kg` : `${pr.bestTotalReps} 次`)
+                  .fontSize(18)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor(this.theme.palette.accent)
+                Text(` · ${pr.sessions} 次`)
+                  .fontSize(12)
+                  .fontColor(this.theme.palette.secondaryText)
+              }
+              .width('100%')
+              .margin({ top: 8 })
+            }, (pr: ExercisePR) => pr.exerciseId)
+            if (this.prList.length > 8) {
+              Text(`…共 ${this.prList.length} 个动作有纪录`)
                 .fontSize(12)
                 .fontColor(this.theme.palette.secondaryText)
+                .margin({ top: 6 })
             }
-            .width('100%')
-            .margin({ top: 6 })
-          }, (pr: ExercisePR) => pr.exerciseId)
-          if (this.prList.length > 8) {
-            Text(`…共 ${this.prList.length} 个动作有纪录`)
-              .fontSize(12)
-              .fontColor(this.theme.palette.secondaryText)
-              .margin({ top: 6 })
           }
+          .width('100%')
+          .padding({ left: 12, right: 12, top: 4, bottom: 10 })
+          .borderRadius(16)
+          .backgroundColor(this.theme.palette.accentGlow ?? this.theme.palette.accentSoft)
+          .margin({ top: 4 })
         }
       } else {
         Row() {
@@ -892,8 +906,9 @@ struct ReportPage {
           .padding(8)
           .width('24%')
           .margin({ bottom: 8 })
-          .borderRadius(10)
-          .backgroundColor(this.theme.palette.inputBackground)
+          .borderRadius(14)
+          .backgroundColor(badge.earned ?
+            (this.theme.palette.accentGlow ?? this.theme.palette.accentSoft) : this.theme.palette.inputBackground)
           .accessibilityText(`${badge.name}：${badge.description}，${badge.earned ? '已达成' : `进度 ${badge.progress}%`}`)
         }, (badge: Badge) => badge.id)
       }
@@ -1142,16 +1157,22 @@ struct ReportPage {
     Column({ space: 6 }) {
       Text(value)
         .fontSize(26)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(this.theme.palette.accent)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(this.theme.palette.ink ?? this.theme.palette.accent)
       Text(label)
         .fontSize(12)
         .fontColor(this.theme.palette.secondaryText)
     }
     .alignItems(HorizontalAlign.Center)
     .padding(16)
-    .borderRadius(14)
+    .borderRadius(20)
     .backgroundColor(this.theme.palette.cardBackground)
+    .radialGradient({
+      center: ['50%', '0%'],
+      radius: 160,
+      colors: SoftGlowUtil.getGlowColors(this.theme.palette.accentGlow ?? this.theme.palette.cardBackground)
+    })
+    .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
     .layoutWeight(1)
   }
 }

@@ -13,6 +13,9 @@ import { UserProfileStore } from '../data/UserProfileStore';
 import { InjuryRecord, INJURY_PARTS } from '../model/InjuryRecord';
 import { InjuryStore } from '../data/InjuryStore';
 import { BodyMetricsStore, BodyMetricEntry } from '../data/BodyMetricsStore';
+import { GoalStore, TrainingGoal } from '../data/GoalStore';
+import { HistoryStore, PeriodStats } from '../data/HistoryStore';
+import { ProgressRing } from '../components/ProgressRing';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 @Entry
@@ -32,6 +35,9 @@ struct ProfilePage {
   @State injuryPart: string = INJURY_PARTS[0];
   @State injuryDateText: string = '';
   @State injuryError: string = '';
+  // 顶部画像卡：周目标达成（ProgressRing 数据源）
+  @State weekSessions: number = 0;
+  @State goalSessions: number = 3;
 
   private store: UserProfileStore | null = null;
   private injuryStore: InjuryStore | null = null;
@@ -40,6 +46,11 @@ struct ProfilePage {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
     this.store = new UserProfileStore(context);
     this.injuryStore = new InjuryStore(context);
+    const goalStore: GoalStore = new GoalStore(context);
+    const goal: TrainingGoal = goalStore.load();
+    this.goalSessions = goal.weeklySessions > 0 ? goal.weeklySessions : 3;
+    const stats: PeriodStats = new HistoryStore(context).getWeeklyStats();
+    this.weekSessions = stats.sessions;
     const profile: UserProfile = this.store.load();
     if (profile.filled) {
       this.gender = profile.gender;
@@ -148,6 +159,52 @@ struct ProfilePage {
 
       Scroll() {
         Column() {
+          // ===== 画像摘要卡：圆形头像（accent 渐变描边）+ 信息 + 周目标 ProgressRing =====
+          Row({ space: 16 }) {
+            // 渐变描边圆形头像框
+            Stack() {
+              Circle({ width: 72, height: 72 })
+                .fill(this.theme.palette.cardBackground)
+                .linearGradient({
+                  angle: 135,
+                  colors: [[this.theme.palette.heroStart, 0.0], [this.theme.palette.heroEnd, 1.0]]
+                })
+                .accessibilityLevel('no')
+              Circle({ width: 64, height: 64 })
+                .fill(this.theme.palette.cardBackground)
+                .accessibilityLevel('no')
+              Text('👤')
+                .fontSize(28)
+                .accessibilityLevel('no')
+            }
+            .accessibilityText('用户头像')
+            Column({ space: 4 }) {
+              Text(`${this.gender} · ${this.ageText} 岁 · ${this.weightText} kg`)
+                .fontSize(16)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
+              Text(`${this.goal} · ${this.level}`)
+                .fontSize(12)
+                .fontColor(this.theme.palette.secondaryText)
+            }
+            .alignItems(HorizontalAlign.Start)
+            .layoutWeight(1)
+            ProgressRing({
+              theme: this.theme,
+              value: Math.min(this.weekSessions, this.goalSessions),
+              total: this.goalSessions,
+              diameter: 64,
+              centerText: `${this.weekSessions}`,
+              caption: '本周目标'
+            })
+          }
+          .width('100%')
+          .padding(16)
+          .borderRadius(20)
+          .backgroundColor(this.theme.palette.cardBackground)
+          .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
+          .margin({ bottom: 14 })
+
           this.selectRow('性别', GENDER_LIST, this.gender, (v: string) => {
             this.gender = v;
           })

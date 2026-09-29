@@ -148,7 +148,7 @@ struct FoodPickerPage {
               Image($r(this.foodImage(item)))
                 .width('100%')
                 .aspectRatio(1)
-                .borderRadius(12)
+                .borderRadius(16)
               Text(item.name)
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
@@ -161,9 +161,10 @@ struct FoodPickerPage {
             }
             .alignItems(HorizontalAlign.Start)
             .padding(8)
-            .borderRadius(14)
+            .borderRadius(20)
             .backgroundColor(this.isSelected(item) ?
               this.theme.palette.inputBackground : this.theme.palette.cardBackground)
+            .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
             .borderWidth(this.isSelected(item) ? 2 : 0)
             .borderColor(this.theme.palette.accent)
             .accessibilityText(`${item.name}，每 100 克 ${item.kcalPer100g} 千卡`)

@@ -12,6 +12,7 @@ import { common } from '@kit.AbilityKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { SectionCard } from '../components/SectionCard';
+import { ProgressRing } from '../components/ProgressRing';
 import {
   ExerciseItem, ExerciseLibrary, EXERCISE_EQUIPMENTS, EXERCISE_MUSCLES
 } from '../data/ExerciseLibrary';
@@ -44,6 +45,7 @@ struct WorkoutLogPage {
   @State private suggestion: OverloadSuggestion | null = null;
   // 组间休息计时器（纯 UI setInterval，到点变色闪烁提醒，不调用震动等系统能力）
   @State private restLeft: number = 0;
+  @State private restTotal: number = 0;
   @State private restRunning: boolean = false;
   @State private restFlash: boolean = false;
   private restTimer: number = -1;
@@ -99,6 +101,7 @@ struct WorkoutLogPage {
   private startRest(seconds: number): void {
     this.clearRestTimers();
     this.restLeft = seconds;
+    this.restTotal = seconds;
     this.restRunning = true;
     this.restFlash = false;
     this.restTimer = setInterval(() => {
@@ -350,14 +353,26 @@ struct WorkoutLogPage {
                   .onChange((v: string) => {
                     row.weightText = v;
                   })
-                Select(this.buildRpeSelectOptions())
-                  .value(row.rpe)
-                  .fontColor(this.theme.palette.primaryText)
-                  .backgroundColor(this.theme.palette.inputBackground)
-                  .layoutWeight(1)
-                  .onSelect((index: number) => {
-                    row.rpe = this.rpeOptions[index];
-                  })
+                // RPE 水平刻度条（6–10，选中格 accent 填充）
+                Row({ space: 2 }) {
+                  ForEach(this.rpeOptions, (rpeValue: string) => {
+                    Text(rpeValue)
+                      .fontSize(11)
+                      .fontColor(row.rpe === rpeValue ?
+                        this.theme.palette.onAccent : this.theme.palette.secondaryText)
+                      .textAlign(TextAlign.Center)
+                      .layoutWeight(1)
+                      .padding({ top: 7, bottom: 7 })
+                      .borderRadius(6)
+                      .backgroundColor(row.rpe === rpeValue ?
+                        this.theme.palette.accent : this.theme.palette.inputBackground)
+                      .onClick(() => {
+                        row.rpe = rpeValue;
+                      })
+                  }, (rpeValue: string): string => rpeValue)
+                }
+                .layoutWeight(1)
+                .accessibilityText(`第 ${idx + 1} 组 RPE，当前 ${row.rpe}`)
                 Select(this.buildRirSelectOptions())
                   .value(row.rir)
                   .fontColor(this.theme.palette.primaryText)
@@ -409,20 +424,20 @@ struct WorkoutLogPage {
             .margin({ top: 14 })
           }
 
-          // ===== 组间休息计时器（建议：复合 150–180s / 孤立 60–90s；到点变色闪烁） =====
+          // ===== 组间休息计时器（极简圆环 + 数字；建议：复合 150–180s / 孤立 60–90s；到点环变红闪烁） =====
           SectionCard({ theme: this.theme, title: '组间休息' }) {
             Row({ space: 14 }) {
-              Text(this.restText())
-                .fontSize(30)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(this.restFlash ? this.theme.palette.onAccent :
+              ProgressRing({
+                theme: this.theme,
+                value: this.restTotal - this.restLeft,
+                total: this.restTotal <= 0 ? 1 : this.restTotal,
+                diameter: 76,
+                ringColor: this.restFlash ? this.theme.palette.danger :
                   (this.restLeft <= 10 && this.restRunning ? this.theme.palette.warning :
-                    this.theme.palette.primaryText))
-                .padding({ left: 14, right: 14, top: 4, bottom: 4 })
-                .borderRadius(12)
-                .backgroundColor(this.restFlash ? this.theme.palette.danger :
-                  this.theme.palette.cardBackground)
-                .accessibilityText(`休息倒计时 ${this.restText()}`)
+                    this.theme.palette.accent),
+                centerText: this.restText(),
+                caption: '休息'
+              })
               Column({ space: 6 }) {
                 Text(this.restRunning ? '休息中…' :
                   (this.restFlash ? '时间到，开始下一组！' :

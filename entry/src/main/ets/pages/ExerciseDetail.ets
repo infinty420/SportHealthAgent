@@ -19,6 +19,9 @@ struct ExerciseDetailPage {
   /** 组间休息剩余秒数（0 = 未计时） */
   @State secondsLeft: number = 0;
   private restTimerId: number = -1;
+  /** 呼吸波形画布上下文 */
+  private breathCtx: CanvasRenderingContext2D =
+    new CanvasRenderingContext2D(new RenderingContextSettings(true));
 
   aboutToAppear(): void {
     const params: ExerciseDetailParams = router.getParams() as ExerciseDetailParams;
@@ -76,6 +79,35 @@ struct ExerciseDetailPage {
     return `${minutes}:${seconds}`;
   }
 
+  /** 呼吸节奏波形：accent 正弦曲线 + 吸/呼端点小圆点（颜色取自调色板） */
+  private drawBreathWave(): void {
+    const ctx: CanvasRenderingContext2D = this.breathCtx;
+    ctx.clearRect(0, 0, 320, 44);
+    ctx.strokeStyle = this.theme.palette.accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x: number = 0; x <= 320; x += 4) {
+      const y: number = 22 + Math.sin(x / 32 * Math.PI) * 14;
+      if (x === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.stroke();
+    // 呼气/吸气端点小圆点
+    ctx.fillStyle = this.theme.palette.accent;
+    ctx.beginPath();
+    ctx.arc(0, 22, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(160, 22, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(320, 22, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   build() {
     Column() {
       // ===== 顶部栏 =====
@@ -124,7 +156,7 @@ struct ExerciseDetailPage {
           Image($r(exercise.imageRes))
             .width('100%')
             .aspectRatio(1)
-            .borderRadius(16)
+            .borderRadius(24)
 
           // 动作名称
           Text(exercise.name)
@@ -159,6 +191,15 @@ struct ExerciseDetailPage {
             .fontSize(14)
             .fontColor(this.theme.palette.primaryText)
             .lineHeight(22)
+          // 呼吸简波形（Canvas 正弦曲线：吸气上行 / 呼气下行，装饰性示意）
+          Canvas(this.breathCtx)
+            .width('100%')
+            .height(44)
+            .key(`breath-${this.theme.mode}`)
+            .accessibilityLevel('no')
+            .onReady(() => {
+              this.drawBreathWave();
+            })
 
           // 目标肌群
           this.sectionTitle('目标肌群')

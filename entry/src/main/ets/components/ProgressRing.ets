@@ -18,15 +18,17 @@ export struct ProgressRing {
   @Prop centerText: string = '';
   /** 中心数字下方的小字说明（可选） */
   @Prop caption: string = '';
-  /** 环尺寸（vp） */
-  @Prop size: number = 84;
+  /** 环直径（vp） */
+  @Prop diameter: number = 84;
+  /** 可选环色（空串 = accent；用于准备度档位四色映射） */
+  @Prop ringColor: string = '';
 
   build() {
     Stack() {
       Progress({ value: this.value, total: this.total, type: ProgressType.Ring })
-        .width(this.size)
-        .height(this.size)
-        .color(this.theme.palette.accent)
+        .width(this.diameter)
+        .height(this.diameter)
+        .color(this.ringColor.length > 0 ? this.ringColor : this.theme.palette.accent)
         .backgroundColor(this.theme.palette.track)
         .style({ strokeWidth: 6 })
       Column({ space: 0 }) {

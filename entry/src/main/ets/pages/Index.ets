@@ -38,6 +38,10 @@ import { MuscleBalanceAnalyzer, MuscleBalanceReport } from '../agent/rules/Muscl
 import { MesocyclePlanner, MesocyclePlan, MesocycleWeek } from '../agent/rules/MesocyclePlanner';
 import { PlanTemplates, PlanTemplate } from '../data/PlanTemplates';
 import { RuleTableStore, RuleTable, ComplementaryRule } from '../data/RuleTableStore';
+import { ProgressRing } from '../components/ProgressRing';
+import { EmptyState } from '../components/EmptyState';
+import { SkeletonCard } from '../components/SkeletonCard';
+import { SoftGlowUtil } from '../utils/SoftGlowUtil';
 import { StrengthCalculator } from '../agent/rules/StrengthCalculator';
 import { HEAT_MUSCLE_GROUPS } from '../agent/rules/TrainingStatsAggregator';
 import { HeatColorUtil } from '../utils/HeatColorUtil';
@@ -185,6 +189,8 @@ struct Index {
   @State proteinPct: number = 30;
   @State carbPct: number = 50;
   @State configErrors: string[] = [];
+  /** 首屏骨架屏：进入首页 600ms 内显示占位，随后切换为真实卡片 */
+  @State bootLoading: boolean = true;
   // 规则 DSL 状态：加重步长 + 互补映射草稿（与 SPORT_TYPE_LIST 等长对齐）
   @State weightStepKg: number = 2.5;
   @State complementaryDrafts: string[] = [];
@@ -240,6 +246,10 @@ struct Index {
     this.refreshMesocycle();
     this.refreshWater();
     this.refreshMealTiming();
+    // 首屏骨架屏：600ms 后切换到真实卡片
+    setTimeout(() => {
+      this.bootLoading = false;
+    }, 600);
   }
 
   /** 从子页面返回时：重载画像、伤病、今日营养与肌群热力 */
@@ -1103,8 +1113,19 @@ struct Index {
 
       Scroll() {
         Column() {
-          // ===== 问候横幅：时段问候 + 日期 + 训练摘要 + 准备度圆环（渐变卡） =====
-          Column() {
+          // ===== 问候横幅：时段问候 + 日期 + 训练摘要 + 准备度圆环（渐变卡 + 柔光叠加） =====
+          Stack() {
+            // 柔光层（accentGlow 径向渐变，预生成色组，装饰用）
+            Row()
+              .width('100%')
+              .height('100%')
+              .radialGradient({
+                center: ['85%', '0%'],
+                radius: 240,
+                colors: SoftGlowUtil.getGlowColors(this.theme.palette.accentGlow ?? this.theme.palette.heroEnd)
+              })
+              .accessibilityLevel('no')
+            Column() {
             Row() {
               Column({ space: 4 }) {
                 Text(this.greeting())
@@ -1129,6 +1150,7 @@ struct Index {
                   .height(64)
                   .color(this.theme.palette.onHero)
                   .backgroundColor(this.theme.palette.heroStart)
+                  .style({ strokeWidth: 6 })
                 Column() {
                   Text(this.readiness === null ? '--' : `${this.readiness.score}`)
                     .fontSize(18)
@@ -1143,16 +1165,22 @@ struct Index {
               .accessibilityText(this.readiness === null ? '准备度未知' : `准备度 ${this.readiness.score} 分`)
             }
             .width('100%')
+            }
+            .width('100%')
+            .padding(16)
           }
           .width('100%')
-          .padding(16)
-          .borderRadius(16)
+          .borderRadius(20)
+          .clip(true)
           .linearGradient({ angle: 135, colors: [[this.theme.palette.heroStart, 0.0], [this.theme.palette.heroEnd, 1.0]] })
-          .shadow({ radius: 14, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 4 })
+          .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
           .margin({ bottom: 14 })
 
           // ===== 今日准备度卡：环形进度（档位四色映射）+ 参与因子 + 过度训练三级预警徽章 =====
-          if (this.readiness !== null) {
+          if (this.bootLoading) {
+            // 首屏骨架屏占位（600ms 呼吸占位后切换真实卡片）
+            SkeletonCard({ theme: this.theme })
+          } else if (this.readiness !== null) {
             this.readinessCard({ report: this.readiness })
           } else {
             SectionCard({ theme: this.theme, title: '今日准备度' }) {
@@ -1357,7 +1385,7 @@ struct Index {
           }
 
           // ===== 本中周期进度卡：容量/强度双折线 + 减载周标记 + 已完成周实色 =====
-          SectionCard({ theme: this.theme, title: '本中周期进度' }) {
+          SectionCard({ theme: this.theme, title: '本中周期进度', index: '02' }) {
             if (this.mesoPlan !== null) {
               Text(`第 ${this.mesoWeek} / ${this.mesoPlan!.lengthWeeks} 周 · ${this.mesoPlan!.note}`)
                 .fontSize(12)
@@ -1426,10 +1454,17 @@ struct Index {
           // ===== 本周肌群容量热力（训练日志驱动，Canvas 人体色块） =====
           SectionCard({ theme: this.theme, title: '本周肌群容量热力' }) {
             if (this.heatTotal() === 0) {
-              Text('暂无力量训练日志，点右上角「📝 记训练」记录组数后，这里会按部位显示热力')
-                .fontSize(13)
-                .fontColor(this.theme.palette.secondaryText)
-                .lineHeight(18)
+              EmptyState({
+                theme: this.theme,
+                message: '暂无力量训练日志，记录组数后这里会按部位显示热力',
+                actionLabel: '去记训练',
+                onAction: () => {
+                  router.pushUrl({ url: 'pages/WorkoutLogPage' })
+                    .catch((err: Error) => {
+                      console.error(`openWorkoutLog failed: ${err.message}`);
+                    });
+                }
+              })
             } else {
               // 真人轮廓底图 + Canvas 热力发光斑叠加
               Stack() {
@@ -1502,11 +1537,9 @@ struct Index {
           }
 
           // ===== 历史与负荷趋势（首页卡） =====
-          SectionCard({ theme: this.theme, title: '历史与负荷趋势' }) {
+          SectionCard({ theme: this.theme, title: '历史与负荷趋势', index: '03' }) {
             if (this.history.length === 0) {
-              Text('暂无历史记录，完成一次分析后这里会展示负荷趋势')
-                .fontSize(13)
-                .fontColor(this.theme.palette.secondaryText)
+              EmptyState({ theme: this.theme, message: '暂无历史记录，完成一次分析后这里会展示负荷趋势' })
             } else {
               if (this.recoveryHint().length > 0) {
                 Text(this.recoveryHint())
@@ -2547,25 +2580,18 @@ struct Index {
   /** 今日准备度卡内容：环形进度（档位四色）+ 参与因子 + 过度训练徽章（$$ 按引用传参） */
   @Builder
   private readinessCard($$: ReadinessRef): void {
-    SectionCard({ theme: this.theme, title: '今日准备度' }) {
+    SectionCard({ theme: this.theme, title: '今日准备度', index: '01' }) {
       Row({ space: 16 }) {
-        Stack() {
-          Progress({ value: $$.report.score, total: 100, type: ProgressType.Ring })
-            .width(76)
-            .height(76)
-            .color(this.tierColor($$.report.tier))
-            .backgroundColor(this.theme.palette.track)
-          Column() {
-            Text(`${$$.report.score}`)
-              .fontSize(20)
-              .fontWeight(FontWeight.Bold)
-              .fontColor(this.tierColor($$.report.tier))
-            Text($$.report.tier)
-              .fontSize(10)
-              .fontColor(this.theme.palette.secondaryText)
-          }
-        }
-        .accessibilityText(`今日准备度 ${$$.report.score} 分，建议强度 ${$$.report.tier}`)
+        // 极简圆环（ProgressRing，stroke 6，档位四色映射）
+        ProgressRing({
+          theme: this.theme,
+          value: $$.report.score,
+          total: 100,
+          diameter: 76,
+          ringColor: this.tierColor($$.report.tier),
+          centerText: `${$$.report.score}`,
+          caption: $$.report.tier
+        })
         Column({ space: 4 }) {
           Text(`建议强度：${$$.report.tier}`)
             .fontSize(14)

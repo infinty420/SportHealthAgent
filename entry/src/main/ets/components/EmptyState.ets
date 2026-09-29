@@ -13,8 +13,8 @@ export struct EmptyState {
   @Prop message: string = '';
   /** 可选行动按钮文案；空串则不显示按钮 */
   @Prop actionLabel: string = '';
-  /** 按钮点击回调（可选） */
-  private onAction?: () => void;
+  /** 按钮点击回调（可选，不传则按钮不响应） */
+  onAction?: () => void;
 
   build() {
     Column({ space: 12 }) {
