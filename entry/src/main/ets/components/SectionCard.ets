@@ -18,6 +18,8 @@ export struct SectionCard {
   @Prop glow: boolean = false;
   /** 卡片内容插槽 */
   @BuilderParam content: () => void;
+  /** 入场动效标记：onAppear 后 250ms 淡入上滑 */
+  @State private entered: boolean = false;
 
   build() {
     Column() {
@@ -51,5 +53,13 @@ export struct SectionCard {
     })
     .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
     .margin({ bottom: 14 })
+    .opacity(this.entered ? 1 : 0)
+    .translate({ x: 0, y: this.entered ? 0 : 16 })
+    .onAppear(() => {
+      // 入场：250ms ease 淡入上滑
+      animateTo({ duration: 250, curve: Curve.EaseOut }, () => {
+        this.entered = true;
+      });
+    })
   }
 }

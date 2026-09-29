@@ -14,6 +14,8 @@ export struct LoadBadge {
   @Prop status: string = '';
   /** 负荷数值（0–100） */
   @Prop load: number = 0;
+  /** 滚动显示的负荷值（-1 = 未滚动） */
+  @State private shownLoad: number = -1;
 
   /** 状态 → 语义色映射（色值来自调色板，非硬编码） */
   private statusColor(): string {
@@ -31,8 +33,8 @@ export struct LoadBadge {
       // 状态色点
       Circle({ width: 10, height: 10 })
         .fill(this.statusColor())
-      // 大数值（accent 纯色）+ 状态文案（状态色）
-      Text(`${this.load}`)
+      // 大数值（accent 纯色，400ms 数字滚动）+ 状态文案（状态色）
+      Text(`${this.shownLoad < 0 ? this.load : this.shownLoad}`)
         .fontSize(Typography.fontSize('numberL'))
         .fontWeight(Typography.fontWeight('numberL'))
         .fontColor(this.theme.palette.accent)
@@ -46,5 +48,18 @@ export struct LoadBadge {
     .borderRadius(14)
     .backgroundColor(this.theme.palette.inputBackground)
     .accessibilityText(`负荷 ${this.load}，状态${this.status}`)
+    .onAppear(() => {
+      // 数字滚动：400ms 内 8 帧从 0 滚到目标值
+      const target: number = this.load;
+      let tick: number = 0;
+      const timerId: number = setInterval(() => {
+        tick++;
+        this.shownLoad = Math.round(target * tick / 8);
+        if (tick >= 8) {
+          this.shownLoad = target;
+          clearInterval(timerId);
+        }
+      }, 50);
+    })
   }
 }

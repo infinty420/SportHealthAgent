@@ -81,6 +81,8 @@ struct ReportPage {
   @State private dayLogs: WorkoutLog[] = [];
   @State private dayVolume: number = 0;
   @State private dayPRs: DailyPREvent[] = [];
+  /** 徽章墙入场动效开关（scale 0.8→1.0 + opacity 0→1，300ms） */
+  @State private badgesShown: boolean = false;
   /** 日期 → 当日破纪录事件 */
   private prByDate: Map<string, DailyPREvent[]> = new Map<string, DailyPREvent[]>();
   private readonly weekHeaders: string[] = ['一', '二', '三', '四', '五', '六', '日'];
@@ -909,10 +911,19 @@ struct ReportPage {
           .borderRadius(14)
           .backgroundColor(badge.earned ?
             (this.theme.palette.accentGlow ?? this.theme.palette.accentSoft) : this.theme.palette.inputBackground)
+          .opacity(this.badgesShown ? 1 : 0)
+          .scale({ x: this.badgesShown ? 1.0 : 0.8, y: this.badgesShown ? 1.0 : 0.8 })
+          .animation({ duration: 300, curve: Curve.EaseOut })
           .accessibilityText(`${badge.name}：${badge.description}，${badge.earned ? '已达成' : `进度 ${badge.progress}%`}`)
         }, (badge: Badge) => badge.id)
       }
       .width('100%')
+      .onAppear(() => {
+        // 徽章解锁入场：scale 0.8→1.0 + opacity 0→1，300ms
+        animateTo({ duration: 300, curve: Curve.EaseOut }, () => {
+          this.badgesShown = true;
+        });
+      })
     }
   }
 

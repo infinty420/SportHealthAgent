@@ -48,6 +48,10 @@ struct WorkoutLogPage {
   @State private restTotal: number = 0;
   @State private restRunning: boolean = false;
   @State private restFlash: boolean = false;
+  /** PR 破纪录横幅文案（空串 = 不显示） */
+  @State private prBanner: string = '';
+  /** PR 横幅动效开关（渐显 + 数字回弹） */
+  @State private prBannerOn: boolean = false;
   private restTimer: number = -1;
   private flashTimer: number = -1;
   private readonly equipments: string[] = ['全部'].concat(EXERCISE_EQUIPMENTS);
@@ -191,7 +195,18 @@ struct WorkoutLogPage {
     historyLogs.push(log);
     const prCheck: PRCheck = PRTracker.checkLatest(historyLogs);
     this.store.save(log);
-    promptAction.showToast({ message: prCheck.isPR ? `🏅 ${prCheck.message}` : '已记录，继续加油！' });
+    if (prCheck.isPR) {
+      // PR 高亮：accentGlow 横幅 0.6s 渐显 + 文本 1.0→1.05 回弹，1.6s 后返回
+      this.prBanner = prCheck.message;
+      animateTo({ duration: 600, curve: Curve.EaseOut }, () => {
+        this.prBannerOn = true;
+      });
+      setTimeout(() => {
+        router.back();
+      }, 1600);
+      return;
+    }
+    promptAction.showToast({ message: '已记录，继续加油！' });
     router.back();
   }
 
@@ -219,6 +234,28 @@ struct WorkoutLogPage {
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 8 })
+
+      // ===== PR 破纪录高亮横幅（accentGlow 渐显 + 回弹，非全屏爆发） =====
+      if (this.prBanner.length > 0) {
+        Row({ space: 10 }) {
+          Text('🏅')
+            .fontSize(22)
+            .accessibilityLevel('no')
+          Text(this.prBanner)
+            .fontSize(15)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.theme.palette.accent)
+            .layoutWeight(1)
+            .scale({ x: this.prBannerOn ? 1.05 : 1.0, y: this.prBannerOn ? 1.05 : 1.0 })
+        }
+        .width('100%')
+        .padding(14)
+        .borderRadius(16)
+        .backgroundColor(this.theme.palette.accentGlow ?? this.theme.palette.accentSoft)
+        .opacity(this.prBannerOn ? 1 : 0)
+        .margin({ left: 16, right: 16, bottom: 10 })
+        .accessibilityText(`破纪录：${this.prBanner}`)
+      }
 
       if (this.selected === null) {
         // ===== 动作选择器：器械 + 部位双维筛选 =====
@@ -415,6 +452,14 @@ struct WorkoutLogPage {
                 .borderRadius(18)
                 .height(36)
                 .layoutWeight(1)
+                .stateStyles({
+                  pressed: {
+                    .scale({ x: 0.96, y: 0.96 })
+                  },
+                  normal: {
+                    .scale({ x: 1.0, y: 1.0 })
+                  }
+                })
                 .accessibilityText('校验并保存训练日志')
                 .onClick(() => {
                   this.saveLog();

@@ -2167,6 +2167,10 @@ struct Index {
     .backgroundColor(this.theme.palette.cardBackground)
     .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 3 })
     .accessibilityText(label)
+    .stateStyles({
+      pressed: { .scale({ x: 0.96, y: 0.96 }) },
+      normal: { .scale({ x: 1.0, y: 1.0 }) }
+    })
     .onClick(action)
   }
 

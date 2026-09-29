@@ -22,6 +22,22 @@ export struct ProgressRing {
   @Prop diameter: number = 84;
   /** 可选环色（空串 = accent；用于准备度档位四色映射） */
   @Prop ringColor: string = '';
+  /** 滚动显示的数值（-1 = 未滚动，直接显示真实值） */
+  @State private shownValue: number = -1;
+
+  /** 数字滚动：400ms ease-out 从 0 滚到目标值（仅纯数字模式） */
+  private rollTo(target: number): void {
+    const steps: number = 8;
+    let tick: number = 0;
+    const timerId: number = setInterval(() => {
+      tick++;
+      this.shownValue = Math.round(target * tick / steps);
+      if (tick >= steps) {
+        this.shownValue = target;
+        clearInterval(timerId);
+      }
+    }, 50);
+  }
 
   build() {
     Stack() {
@@ -32,7 +48,8 @@ export struct ProgressRing {
         .backgroundColor(this.theme.palette.track)
         .style({ strokeWidth: 6 })
       Column({ space: 0 }) {
-        Text(this.centerText.length > 0 ? this.centerText : `${Math.round(this.value)}`)
+        Text(this.centerText.length > 0 ? this.centerText :
+          `${this.shownValue < 0 ? Math.round(this.value) : this.shownValue}`)
           .fontSize(Typography.fontSize('numberL'))
           .fontWeight(Typography.fontWeight('numberL'))
           .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
@@ -45,5 +62,11 @@ export struct ProgressRing {
       .alignItems(HorizontalAlign.Center)
     }
     .accessibilityText(`进度 ${Math.round(this.value)}，共 ${Math.round(this.total)}`)
+    .onAppear(() => {
+      // 纯数字模式（无自定义中心文本）时执行数字滚动
+      if (this.centerText.length === 0) {
+        this.rollTo(this.value);
+      }
+    })
   }
 }
