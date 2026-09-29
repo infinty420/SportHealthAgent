@@ -264,22 +264,45 @@ struct WorkoutLogPage {
         Grid() {
           ForEach(this.shownList, (item: ExerciseItem) => {
             GridItem() {
-              Column({ space: 4 }) {
+              Column({ space: 6 }) {
+                Image($r(item.imageRes))
+                  .width('100%')
+                  .aspectRatio(1)
+                  .borderRadius(16)
                 Text(item.name)
                   .fontSize(14)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(this.theme.palette.primaryText)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
-                Text(`${item.muscle}·${item.subMuscle}`)
-                  .fontSize(11)
-                  .fontColor(this.theme.palette.secondaryText)
+                Row() {
+                  Text(`${item.muscle}·${item.subMuscle}`)
+                    .fontSize(11)
+                    .fontColor(this.theme.palette.secondaryText)
+                  Blank()
+                  // 难度：3 颗小圆点（初级 1 / 中级 2 / 高级 3）
+                  Row({ space: 3 }) {
+                    ForEach([1, 2, 3], (dot: number) => {
+                      Circle({ width: 5, height: 5 })
+                        .fill(dot <= this.difficultyDots(item.difficulty) ?
+                          this.theme.palette.accent : this.theme.palette.track)
+                    }, (dot: number): string => `${dot}`)
+                  }
+                  .accessibilityText(`难度${item.difficulty}`)
+                }
+                .width('100%')
+                .alignItems(VerticalAlign.Center)
               }
               .alignItems(HorizontalAlign.Start)
-              .padding(10)
-              .borderRadius(12)
+              .padding(8)
+              .borderRadius(20)
               .backgroundColor(this.theme.palette.cardBackground)
+              .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
               .accessibilityText(`选择动作 ${item.name}`)
+              .stateStyles({
+                pressed: { .scale({ x: 0.96, y: 0.96 }) },
+                normal: { .scale({ x: 1.0, y: 1.0 }) }
+              })
               .onClick(() => {
                 this.selectExercise(item);
               })
@@ -334,6 +357,17 @@ struct WorkoutLogPage {
 
   private filterActive(isEquipment: boolean, option: string): boolean {
     return isEquipment ? this.selectedEquipment === option : this.selectedMuscle === option;
+  }
+
+  /** 难度文案 → 圆点数（初级 1 / 中级 2 / 高级 3，未知按 1） */
+  private difficultyDots(difficulty: string): number {
+    if (difficulty === '高级') {
+      return 3;
+    }
+    if (difficulty === '中级') {
+      return 2;
+    }
+    return 1;
   }
 
   /** 组数录入面板（参数局部收窄，规避 ArkTS 对 this 成员不做智能收窄的限制） */
