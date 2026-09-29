@@ -1160,7 +1160,7 @@ struct Index {
             Column() {
               Circle({ width: 140, height: 140 })
                 .fill(this.theme.palette.onHero)
-                .opacity(0.06)
+                .opacity(0.05)
                 .translate({ x: 30, y: -70 })
             }
             .width('100%')
@@ -1170,7 +1170,7 @@ struct Index {
             Column() {
               Circle({ width: 90, height: 90 })
                 .fill(this.theme.palette.onHero)
-                .opacity(0.06)
+                .opacity(0.05)
                 .translate({ x: -30, y: 50 })
             }
             .width('100%')
@@ -1248,17 +1248,17 @@ struct Index {
           Row({ space: 10 }) {
             StatCard({
               theme: this.theme, label: '本周时长', value: `${this.weeklyDurationDone()}`,
-              unit: '分钟', iconRes: 'app.media.ic_duration', tone: 'blue', enterDelay: 0
+              unit: '分钟', iconRes: 'app.media.ic_duration', tone: 'blue', enterDelay: 0, compact: true
             })
               .layoutWeight(1)
             StatCard({
               theme: this.theme, label: '本周消耗', value: `${this.weeklyCaloriesDone()}`,
-              unit: '千卡', iconRes: 'app.media.ic_calorie', tone: 'green', enterDelay: 40
+              unit: '千卡', iconRes: 'app.media.ic_calorie', tone: 'green', enterDelay: 40, compact: true
             })
               .layoutWeight(1)
             StatCard({
               theme: this.theme, label: '本周频次', value: `${this.weeklySessionsDone()}`,
-              unit: '次', iconRes: 'app.media.ic_frequency', tone: 'orange', enterDelay: 80
+              unit: '次', iconRes: 'app.media.ic_frequency', tone: 'orange', enterDelay: 80, compact: true
             })
               .layoutWeight(1)
           }
@@ -1350,21 +1350,33 @@ struct Index {
           // ===== 每日状态卡（睡眠/酸痛/饮水 + 准备度） =====
           SectionCard({ theme: this.theme, title: '每日状态', iconRes: 'app.media.ic_frequency', accentTone: 'orange', enterDelay: 80 }) {
             Row({ space: 10 }) {
-              this.numberField('睡眠（小时）', this.sleepHoursText, (v: string) => {
-                this.sleepHoursText = v;
-              })
-              this.numberField('饮水（ml）', this.waterText, (v: string) => {
-                this.waterText = v;
-              })
+              Column() {
+                this.numberField('睡眠（小时）', this.sleepHoursText, (v: string) => {
+                  this.sleepHoursText = v;
+                })
+              }
+              .layoutWeight(1)
+              Column() {
+                this.numberField('饮水（ml）', this.waterText, (v: string) => {
+                  this.waterText = v;
+                })
+              }
+              .layoutWeight(1)
             }
             .width('100%')
             Row({ space: 10 }) {
-              this.rateSelect('睡眠质量', this.sleepQuality, (v: number) => {
-                this.sleepQuality = v;
-              })
-              this.rateSelect('酸痛程度', this.soreness, (v: number) => {
-                this.soreness = v;
-              })
+              Column() {
+                this.rateSelect('睡眠质量', this.sleepQuality, (v: number) => {
+                  this.sleepQuality = v;
+                })
+              }
+              .layoutWeight(1)
+              Column() {
+                this.rateSelect('酸痛程度', this.soreness, (v: number) => {
+                  this.soreness = v;
+                })
+              }
+              .layoutWeight(1)
             }
             .width('100%')
             .margin({ top: 8 })
@@ -1462,12 +1474,18 @@ struct Index {
             }
             .width('100%')
             Row({ space: 10 }) {
-              this.numberField('周次数目标', `${this.goal.weeklySessions}`, (v: string) => {
-                this.updateGoal(v, 'sessions');
-              })
-              this.numberField('周时长目标（分钟）', `${this.goal.weeklyDurationMin}`, (v: string) => {
-                this.updateGoal(v, 'duration');
-              })
+              Column() {
+                this.numberField('周次数目标', `${this.goal.weeklySessions}`, (v: string) => {
+                  this.updateGoal(v, 'sessions');
+                })
+              }
+              .layoutWeight(1)
+              Column() {
+                this.numberField('周时长目标（分钟）', `${this.goal.weeklyDurationMin}`, (v: string) => {
+                  this.updateGoal(v, 'duration');
+                })
+              }
+              .layoutWeight(1)
             }
             .width('100%')
             .margin({ top: 8 })
@@ -2593,7 +2611,7 @@ struct Index {
             .fontColor(`${current}` === option ?
               this.theme.palette.onAccent : this.theme.palette.primaryText)
             .textAlign(TextAlign.Center)
-            .width(32)
+            .layoutWeight(1)
             .height(30)
             .borderRadius(8)
             .backgroundColor(`${current}` === option ?
@@ -2604,8 +2622,10 @@ struct Index {
             })
         }, (option: string) => option)
       }
+      .width('100%')
     }
     .alignItems(HorizontalAlign.Start)
+    .width('100%')
     .margin({ bottom: 10 })
   }
 

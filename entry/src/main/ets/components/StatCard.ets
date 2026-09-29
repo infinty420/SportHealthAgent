@@ -24,6 +24,8 @@ export struct StatCard {
   @Prop tone: string = 'blue';
   /** 入场错峰延迟（ms），默认 0；仅首屏前几张卡片传入 */
   @Prop enterDelay: number = 0;
+  /** 紧凑变体：窄卡（一行三卡）场景使用，数字 22 / 徽章 28 / 内边距 12 */
+  @Prop compact: boolean = false;
   /** 入场动效标记 */
   @State private entered: boolean = false;
 
@@ -68,14 +70,15 @@ export struct StatCard {
         Column({ space: 4 }) {
           Row({ space: 4 }) {
             Text(this.value)
-              .fontSize(Typography.fontSize('numberXL'))
+              .fontSize(this.compact ? 22 : Typography.fontSize('numberXL'))
               .fontWeight(Typography.fontWeight('numberXL'))
               .fontColor(this.theme.palette.ink ?? this.theme.palette.primaryText)
+              .maxLines(1)
             if (this.unit.length > 0) {
               Text(this.unit)
                 .fontSize(12)
                 .fontColor(this.theme.palette.secondaryText)
-                .margin({ top: 14 })
+                .margin({ top: this.compact ? 6 : 14 })
             }
           }
           .alignItems(VerticalAlign.Bottom)
@@ -86,11 +89,11 @@ export struct StatCard {
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
         if (this.iconRes.length > 0) {
-          IconBadge({ theme: this.theme, iconRes: this.iconRes, tone: this.tone, badgeSize: 40 })
+          IconBadge({ theme: this.theme, iconRes: this.iconRes, tone: this.tone, badgeSize: this.compact ? 28 : 40 })
         }
       }
       .width('100%')
-      .padding(DesignTokens.space16)
+      .padding(this.compact ? 12 : DesignTokens.space16)
       .alignItems(VerticalAlign.Top)
     }
     .alignItems(HorizontalAlign.Start)
