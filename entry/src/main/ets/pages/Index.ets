@@ -81,6 +81,14 @@ interface RateSpec {
   onPick: (v: number) => void;
 }
 
+/** 带单位数字输入参数（单位显示在输入框右侧，标签只留名词） */
+interface UnitFieldSpec {
+  label: string;
+  unit: string;
+  value: string;
+  onChange: (v: string) => void;
+}
+
 @Entry
 @Component
 struct Index {
@@ -135,6 +143,12 @@ struct Index {
   @State showPlanTemplates: boolean = false;
   /** 计划页规则设置折叠状态（小按键点击展开） */
   @State showRuleConfig: boolean = false;
+  /** 准备度参与因子展开状态（解释层默认隐藏） */
+  @State showReadinessFactors: boolean = false;
+  /** 本周目标编辑展开状态（齿轮点击展开） */
+  @State showGoalEdit: boolean = false;
+  /** 训练页小贴士展开状态（默认一行） */
+  @State tipExpanded: boolean = false;
 
   // 本周肌群容量热力（按部位有效组数；Canvas 人体色块直读）
   @State heatChest: number = 0;
@@ -1215,10 +1229,47 @@ struct Index {
                   .fontSize(12)
                   .fontColor(this.theme.palette.onHero)
                   .opacity(0.85)
-                Text(`🔥 连续 ${this.consecutiveTrainingDays()} 天 · ⚡ 本周 ${this.weeklySessionsDone()} 次 · 🎯 ${this.weeklyGoalRate()}%`)
-                  .fontSize(12)
-                  .fontColor(this.theme.palette.onHero)
-                  .margin({ top: 6 })
+                // 迷你徽章行：图标 + 大数字 + 小单位（替代原长串文字）
+                Row({ space: 16 }) {
+                  Row({ space: 3 }) {
+                    Text('🔥')
+                      .fontSize(12)
+                    Text(`${this.consecutiveTrainingDays()}`)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(this.theme.palette.onHero)
+                    Text('天')
+                      .fontSize(10)
+                      .fontColor(this.theme.palette.onHero)
+                      .opacity(0.8)
+                  }
+                  .alignItems(VerticalAlign.Bottom)
+                  Row({ space: 3 }) {
+                    Text('⚡')
+                      .fontSize(12)
+                    Text(`${this.weeklySessionsDone()}`)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(this.theme.palette.onHero)
+                    Text('次')
+                      .fontSize(10)
+                      .fontColor(this.theme.palette.onHero)
+                      .opacity(0.8)
+                  }
+                  .alignItems(VerticalAlign.Bottom)
+                  Row({ space: 3 }) {
+                    Text('🎯')
+                      .fontSize(12)
+                    Text(`${this.weeklyGoalRate()}%`)
+                      .fontSize(15)
+                      .fontWeight(FontWeight.Bold)
+                      .fontColor(this.theme.palette.onHero)
+                  }
+                  .alignItems(VerticalAlign.Bottom)
+                }
+                .margin({ top: 8 })
+                .accessibilityText(`连续训练 ${this.consecutiveTrainingDays()} 天，` +
+                  `本周 ${this.weeklySessionsDone()} 次，目标完成 ${this.weeklyGoalRate()}%`)
               }
               .alignItems(HorizontalAlign.Start)
               .layoutWeight(1)
@@ -1285,7 +1336,7 @@ struct Index {
             this.readinessCard({ report: this.readiness })
           } else {
             SectionCard({ theme: this.theme, title: '今日准备度', iconRes: 'app.media.ic_recovery', accentTone: 'blue', enterDelay: 0 }) {
-              Text('保存一次「每日状态」后，这里显示今日准备度与强度建议')
+              Text('保存每日状态后显示')
                 .fontSize(13)
                 .fontColor(this.theme.palette.secondaryText)
             }
@@ -1363,15 +1414,15 @@ struct Index {
           SectionCard({ theme: this.theme, title: '每日状态', iconRes: 'app.media.ic_frequency', accentTone: 'orange', enterDelay: 80 }) {
             Row({ space: 10 }) {
               Column() {
-                this.numberField('睡眠（小时）', this.sleepHoursText, (v: string) => {
+                this.unitField({ label: '睡眠', unit: '小时', value: this.sleepHoursText, onChange: (v: string) => {
                   this.sleepHoursText = v;
-                })
+                } })
               }
               .layoutWeight(1)
               Column() {
-                this.numberField('饮水（ml）', this.waterText, (v: string) => {
+                this.unitField({ label: '饮水', unit: 'ml', value: this.waterText, onChange: (v: string) => {
                   this.waterText = v;
-                })
+                } })
               }
               .layoutWeight(1)
             }
@@ -1485,22 +1536,37 @@ struct Index {
               .layoutWeight(1)
             }
             .width('100%')
-            Row({ space: 10 }) {
-              Column() {
-                this.numberField('周次数目标', `${this.goal.weeklySessions}`, (v: string) => {
-                  this.updateGoal(v, 'sessions');
+            // 调整目标：默认收起，点齿轮展开两个输入项
+            Row() {
+              Blank()
+              Text(this.showGoalEdit ? '收起 ▲' : '⚙️ 调整目标')
+                .fontSize(12)
+                .fontColor(this.theme.palette.accent)
+                .accessibilityText('展开或收起周目标设置')
+                .onClick(() => {
+                  this.showGoalEdit = !this.showGoalEdit;
                 })
-              }
-              .layoutWeight(1)
-              Column() {
-                this.numberField('周时长目标（分钟）', `${this.goal.weeklyDurationMin}`, (v: string) => {
-                  this.updateGoal(v, 'duration');
-                })
-              }
-              .layoutWeight(1)
             }
             .width('100%')
-            .margin({ top: 8 })
+            .margin({ top: 6 })
+            if (this.showGoalEdit) {
+              Row({ space: 10 }) {
+                Column() {
+                  this.unitField({ label: '次数目标', unit: '次/周', value: `${this.goal.weeklySessions}`, onChange: (v: string) => {
+                    this.updateGoal(v, 'sessions');
+                  } })
+                }
+                .layoutWeight(1)
+                Column() {
+                  this.unitField({ label: '时长目标', unit: '分钟/周', value: `${this.goal.weeklyDurationMin}`, onChange: (v: string) => {
+                    this.updateGoal(v, 'duration');
+                  } })
+                }
+                .layoutWeight(1)
+              }
+              .width('100%')
+              .margin({ top: 8 })
+            }
           }
 
           // ===== 本中周期进度卡：容量/强度双折线 + 减载周标记 + 已完成周实色 =====
@@ -1837,12 +1903,18 @@ struct Index {
 
       Scroll() {
         Column() {
-          // ===== 今日小贴士（本地内置，按日期轮换） =====
+          // ===== 今日小贴士（默认一行，点击展开全文） =====
           SectionCard({ theme: this.theme, title: '💡 今日小贴士' }) {
             Text(this.todayTip())
               .fontSize(13)
               .fontColor(this.theme.palette.primaryText)
               .lineHeight(20)
+              .maxLines(this.tipExpanded ? 5 : 1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+              .accessibilityText('今日小贴士，点击展开或收起')
+              .onClick(() => {
+                this.tipExpanded = !this.tipExpanded;
+              })
           }
 
           // ===== 数据录入卡片 =====
@@ -1861,21 +1933,54 @@ struct Index {
               })
               .margin({ bottom: 10 })
 
-            this.numberField('运动时长（分钟）', this.durationText, (v: string) => {
+            this.unitField({ label: '运动时长', unit: '分钟', value: this.durationText, onChange: (v: string) => {
               this.durationText = v;
-            })
-            this.numberField('平均心率（次/分）', this.hrText, (v: string) => {
+            } })
+            this.unitField({ label: '平均心率', unit: '次/分', value: this.hrText, onChange: (v: string) => {
               this.hrText = v;
-            })
-            this.textField('配速（如 6\'00"/km，无则填 -）', this.paceText, (v: string) => {
-              this.paceText = v;
-            })
-            this.numberField('消耗热量（千卡）', this.caloriesText, (v: string) => {
+            } })
+            // 配速：说明文字进 placeholder，标签只留名词
+            Column({ space: 4 }) {
+              Text('配速')
+                .fontSize(13)
+                .fontColor(this.theme.palette.secondaryText)
+              TextInput({ text: this.paceText, placeholder: '如 6\'00"/km，无则填 -' })
+                .fontColor(this.theme.palette.primaryText)
+                .placeholderColor(this.theme.palette.secondaryText)
+                .backgroundColor(this.theme.palette.inputBackground)
+                .caretColor(this.theme.palette.accent)
+                .borderRadius(10)
+                .accessibilityText('输入配速')
+                .onChange((v: string) => {
+                  this.paceText = v;
+                })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .margin({ bottom: 10 })
+            this.unitField({ label: '消耗热量', unit: '千卡', value: this.caloriesText, onChange: (v: string) => {
               this.caloriesText = v;
-            })
-            this.numberField('训练负荷（0–100，留空自动估算）', this.loadText, (v: string) => {
-              this.loadText = v;
-            })
+            } })
+            // 训练负荷：说明进 placeholder
+            Column({ space: 4 }) {
+              Text('训练负荷')
+                .fontSize(13)
+                .fontColor(this.theme.palette.secondaryText)
+              TextInput({ text: this.loadText, placeholder: '0–100，留空自动估算' })
+                .type(InputType.Number)
+                .fontColor(this.theme.palette.primaryText)
+                .placeholderColor(this.theme.palette.secondaryText)
+                .backgroundColor(this.theme.palette.inputBackground)
+                .caretColor(this.theme.palette.accent)
+                .borderRadius(10)
+                .accessibilityText('输入训练负荷')
+                .onChange((v: string) => {
+                  this.loadText = v;
+                })
+            }
+            .alignItems(HorizontalAlign.Start)
+            .width('100%')
+            .margin({ bottom: 10 })
 
             // 校验错误提示
             if (this.errors.length > 0) {
@@ -2023,7 +2128,7 @@ struct Index {
                   .fontSize(15)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(this.theme.palette.primaryText)
-                Text('完成一次运动数据分析后，这里会生成本周训练计划（含休息日与强度轮换）')
+                Text('完成一次分析后自动生成本周计划')
                   .fontSize(13)
                   .fontColor(this.theme.palette.secondaryText)
                   .lineHeight(18)
@@ -2581,11 +2686,14 @@ struct Index {
             .fontSize(14)
             .fontWeight(FontWeight.Medium)
             .fontColor(this.theme.palette.primaryText)
-          Text(`疲劳 ${this.readinessFatigue} · 睡眠 ${this.sleepHoursText}h · 酸痛 ${this.soreness}/5` +
-            (this.readinessHours >= 0 ? ` · 距上次 ${Math.round(this.readinessHours)}h` : ''))
+          // 参与因子收进解释层：点击展开/收起
+          Text(this.showReadinessFactors ? '收起 ▲' : '为什么是这个分数？ ⓘ')
             .fontSize(12)
-            .fontColor(this.theme.palette.secondaryText)
-            .lineHeight(17)
+            .fontColor(this.theme.palette.accent)
+            .accessibilityText('展开或收起准备度参与因子')
+            .onClick(() => {
+              this.showReadinessFactors = !this.showReadinessFactors;
+            })
           // 过度训练三级预警徽章（黄/橙/红，点击弹出命中条件）
           if ($$.report.overtrainingLevel !== '无') {
             Text(`${$$.report.overtrainingLevel}色预警 · 点击查看原因`)
@@ -2614,7 +2722,46 @@ struct Index {
         .layoutWeight(1)
       }
       .width('100%')
+      // 解释层：参与因子明细（默认隐藏）
+      if (this.showReadinessFactors) {
+        Text(`疲劳 ${this.readinessFatigue} · 睡眠 ${this.sleepHoursText}h · 酸痛 ${this.soreness}/5` +
+          (this.readinessHours >= 0 ? ` · 距上次 ${Math.round(this.readinessHours)}h` : ''))
+          .fontSize(12)
+          .fontColor(this.theme.palette.secondaryText)
+          .lineHeight(17)
+          .margin({ top: 8 })
+      }
     }
+  }
+
+  /** 带单位数字输入框（单位在输入框右侧；$$ 按引用传参） */
+  @Builder
+  private unitField($$: UnitFieldSpec): void {
+    Column({ space: 4 }) {
+      Text($$.label)
+        .fontSize(13)
+        .fontColor(this.theme.palette.secondaryText)
+      Row({ space: 6 }) {
+        TextInput({ text: $$.value })
+          .type(InputType.Number)
+          .fontColor(this.theme.palette.primaryText)
+          .placeholderColor(this.theme.palette.secondaryText)
+          .backgroundColor(this.theme.palette.inputBackground)
+          .caretColor(this.theme.palette.accent)
+          .borderRadius(10)
+          .layoutWeight(1)
+          .accessibilityText(`输入${$$.label}，单位${$$.unit}`)
+          .onChange($$.onChange)
+        Text($$.unit)
+          .fontSize(12)
+          .fontColor(this.theme.palette.secondaryText)
+      }
+      .alignItems(VerticalAlign.Center)
+      .width('100%')
+    }
+    .alignItems(HorizontalAlign.Start)
+    .width('100%')
+    .margin({ bottom: 10 })
   }
 
   /** 准备度摘要行（每日状态卡内嵌展示） */
