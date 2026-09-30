@@ -15,6 +15,14 @@ import { DietLog, DietLogEntry, MEAL_TYPES } from '../data/DietLog';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { BackgroundLayer } from '../components/BackgroundLayer';
 
+/** 底部操作面板参数（@Builder 按引用传参：按值传参不触发 UI 刷新，选中食物后面板不弹出） */
+interface FoodPanelRef {
+  /** 是否已选中食物（true 时面板显示） */
+  hasFood: boolean;
+  /** 选中食物名（无障碍朗读用；未选中为空串） */
+  foodName: string;
+}
+
 @Entry
 @Component
 struct FoodPickerPage {
@@ -218,7 +226,10 @@ struct FoodPickerPage {
       .scrollBar(BarState.Off)
 
       // ===== 底部：份量 + 餐次 + 添加 =====
-      this.bottomPanel(this.selectedFood)
+      this.bottomPanel({
+        hasFood: this.selectedFood !== null,
+        foodName: this.selectedFood === null ? '' : this.selectedFood.name
+      })
     }
       .width('100%')
       .height('100%')
@@ -227,10 +238,10 @@ struct FoodPickerPage {
     .height('100%')
   }
 
-  /** 底部操作面板（参数局部收窄，规避 ArkTS 对 this 成员不做智能收窄的限制） */
+  /** 底部操作面板（$$ 按引用传参，保证选中食物后面板即时弹出） */
   @Builder
-  private bottomPanel(food: FoodItem | null): void {
-    if (food !== null) {
+  private bottomPanel($$: FoodPanelRef): void {
+    if ($$.hasFood) {
       Column({ space: 10 }) {
         Row({ space: 10 }) {
           Text($r('app.string.food_picker_meal'))
@@ -267,7 +278,7 @@ struct FoodPickerPage {
           .backgroundColor(this.theme.palette.accent)
           .borderRadius(20)
           .width('100%')
-          .accessibilityDescription(`将 ${food.name} 加入今日饮食记录`)
+          .accessibilityDescription(`将 ${$$.foodName} 加入今日饮食记录`)
           .onClick(() => {
             this.addToLog();
           })
