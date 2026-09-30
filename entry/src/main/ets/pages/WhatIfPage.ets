@@ -230,7 +230,7 @@ struct WhatIfPage {
               .fontColor(this.theme.palette.accent)
               .lineHeight(19)
               .margin({ top: 6 })
-            Text('以上为确定性公式估算（7700 kcal ≈ 1kg），仅供参考，非医疗建议')
+            Text('公式估算（7700 kcal ≈ 1kg），仅供参考')
               .fontSize(11)
               .fontColor(this.theme.palette.secondaryText)
               .margin({ top: 10 })

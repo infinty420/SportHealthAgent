@@ -177,7 +177,7 @@ struct FoodPickerPage {
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(this.theme.palette.primaryText)
-              Text(`${item.kcalPer100g} kcal/100g`)
+              Text(`${item.kcalPer100g} 千卡`)
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
                 .maxLines(1)

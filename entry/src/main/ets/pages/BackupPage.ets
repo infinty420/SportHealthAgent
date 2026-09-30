@@ -99,7 +99,7 @@ struct BackupPage {
 
       Column() {
         SectionCard({ theme: this.theme, title: '一键导出' }) {
-          Text('把画像、历史记录、训练日志、饮食记录、目标与设置等全部本地数据导出为单个 JSON 文件（保存在应用沙箱内，不联网、不分享）。')
+          Text('全部本地数据导出为单个 JSON 文件（存沙箱，不联网）')
             .fontSize(13)
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(19)

@@ -390,7 +390,7 @@ struct ProfilePage {
             .onClick(() => {
               this.save();
             })
-          Text('画像仅保存在本机，用于心率区间修正、热量估算与饮食配比个性化')
+          Text('画像仅保存在本机，不上传')
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
             .margin({ top: 10 })

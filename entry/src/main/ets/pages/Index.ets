@@ -1390,7 +1390,7 @@ struct Index {
                 .fontColor(this.theme.palette.primaryText)
                 .margin({ bottom: 8 })
             } else {
-              Text('填写画像后：心率区间按年龄修正、热量按体重估算、饮食配比按目标调整')
+              Text('填写画像后，建议更贴合你的身体数据')
                 .fontSize(13)
                 .fontColor(this.theme.palette.secondaryText)
                 .margin({ bottom: 8 })
@@ -2077,7 +2077,7 @@ struct Index {
                 .width('100%')
                 .padding({ top: 8, bottom: 8 })
               }, (template: PlanTemplate) => template.id)
-              Text('生成后重置「本中周期进度」为新模板的第 1 周；分化安排详见首页中周期卡')
+              Text('生成后中周期从第 1 周重排')
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
                 .lineHeight(16)
@@ -2221,7 +2221,7 @@ struct Index {
             .width('100%')
             .margin({ top: 6, bottom: 8 })
 
-            Text('练完某项后，下次想练什么？（不设置 = 用内置推荐）')
+            Text('练完某项后，下次想练什么？')
               .fontSize(13)
               .fontColor(this.theme.palette.secondaryText)
               .margin({ bottom: 6 })
@@ -2292,7 +2292,7 @@ struct Index {
               }
               .width('100%')
             } else {
-              Text('当前没有自定义规则，全部按内置互补推荐执行')
+              Text('暂无自定义规则，用内置推荐')
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
                 .margin({ top: 8 })
@@ -2592,12 +2592,12 @@ struct Index {
         this.compareRow('饮食热量', `${$$.report.diet.totalCalories}千卡`,
           `${this.reportV2.diet.totalCalories}千卡`,
           `${this.reportV3.diet.totalCalories}千卡`)
-        Text('警告色描边 = 引擎结论不同的字段；V2 加权评分+趋势斜率，V3 另加采纳反馈加权')
+        Text('描边字段 = 引擎结论不同')
           .fontSize(11)
           .fontColor(this.theme.palette.secondaryText)
           .margin({ top: 8 })
       } else {
-        Text('在下方「规则设置」中选择「V1·V2 对比」后，这里并列展示三个引擎的报告差异')
+        Text('在规则设置中开启对比后显示差异')
           .fontSize(13)
           .fontColor(this.theme.palette.secondaryText)
       }

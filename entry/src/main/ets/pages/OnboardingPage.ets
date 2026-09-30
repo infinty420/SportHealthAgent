@@ -185,7 +185,7 @@ struct OnboardingPage {
               this.optionChips({ options: EXPERIENCE_LEVEL_LIST, current: this.experienceLevel, onPick: (v: string) => {
                 this.experienceLevel = v;
               } })
-              Text('经验等级影响引擎的强度与容量建议：新手更保守，高阶更激进')
+              Text('新手更保守，高阶更激进')
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
                 .lineHeight(16)

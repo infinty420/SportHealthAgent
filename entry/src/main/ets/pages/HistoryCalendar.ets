@@ -841,7 +841,7 @@ export struct HistoryCalendar {
             .margin({ bottom: 8 })
 
             if (this.rangeLogCount === 0 && this.durCurrent === 0) {
-              Text('该周期暂无数据，完成训练记录后这里会展示统计')
+              Text('该周期暂无数据')
                 .fontSize(13)
                 .fontColor(this.theme.palette.secondaryText)
                 .lineHeight(18)

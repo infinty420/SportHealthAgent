@@ -837,12 +837,12 @@ struct ReportPage {
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor(this.theme.palette.primaryText)
-        Text('点击日历中某一天，可查看当日记录与破纪录事件')
+        Text('点击日期查看当日记录')
           .fontSize(11)
           .fontColor(this.theme.palette.secondaryText)
           .margin({ top: 2, bottom: 4 })
         if (this.prList.length === 0) {
-          Text('暂无力量训练纪录，在「记训练」中录入组数后自动生成')
+          Text('暂无纪录，录入组数后自动生成')
             .fontSize(13)
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(18)
@@ -1015,7 +1015,7 @@ struct ReportPage {
   private whatIfCard(result: WhatIfResult | null): void {
     SectionCard({ theme: this.theme, title: 'What-if 情景模拟' }) {
       if (this.currentWeightKg <= 0) {
-        Text('先在「用户画像」中填写体重，再模拟未来趋势')
+        Text('先在画像页填体重')
           .fontSize(13)
           .fontColor(this.theme.palette.secondaryText)
           .lineHeight(18)
@@ -1135,7 +1135,7 @@ struct ReportPage {
   private weightTrendCard(trend: WeightTrendReport | null): void {
     SectionCard({ theme: this.theme, title: '体重趋势' }) {
       if (trend === null || trend.samples < 2) {
-        Text('体重数据不足，在「用户画像」中更新体重后，这里会显示趋势与 4 周预测')
+        Text('体重数据不足，更新后显示趋势预测')
           .fontSize(13)
           .fontColor(this.theme.palette.secondaryText)
           .lineHeight(18)
