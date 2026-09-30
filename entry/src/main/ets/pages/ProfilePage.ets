@@ -7,9 +7,11 @@
  */
 import { promptAction, router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
+import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { ThemeManager } from '../theme/ThemeManager';
 import { UserProfile, GENDER_LIST, USER_GOAL_LIST, EXPERIENCE_LEVEL_LIST } from '../model/UserProfile';
 import { UserProfileStore } from '../data/UserProfileStore';
+import { AvatarStore } from '../data/AvatarStore';
 import { InjuryRecord, INJURY_PARTS } from '../model/InjuryRecord';
 import { InjuryStore } from '../data/InjuryStore';
 import { BodyMetricsStore, BodyMetricEntry } from '../data/BodyMetricsStore';
@@ -39,14 +41,19 @@ struct ProfilePage {
   // 顶部画像卡：周目标达成（ProgressRing 数据源）
   @State weekSessions: number = 0;
   @State goalSessions: number = 3;
+  // 头像沙箱路径（空串显示默认 👤；点击可从相册更换）
+  @State avatarPath: string = '';
 
   private store: UserProfileStore | null = null;
   private injuryStore: InjuryStore | null = null;
+  private avatarStore: AvatarStore | null = null;
 
   aboutToAppear(): void {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
     this.store = new UserProfileStore(context);
     this.injuryStore = new InjuryStore(context);
+    this.avatarStore = new AvatarStore(context);
+    this.avatarPath = this.avatarStore.load();
     const goalStore: GoalStore = new GoalStore(context);
     const goal: TrainingGoal = goalStore.load();
     this.goalSessions = goal.weeklySessions > 0 ? goal.weeklySessions : 3;
@@ -73,6 +80,32 @@ struct ProfilePage {
     if (this.injuryStore !== null) {
       this.injuryParts = this.injuryStore.activeParts();
     }
+  }
+
+  /** 从系统相册选择头像（系统 Picker 授权读取，无需申请权限；图片复制进沙箱持久化，无网络请求） */
+  private pickAvatar(): void {
+    if (this.avatarStore === null) {
+      return;
+    }
+    const options: photoAccessHelper.PhotoSelectOptions = new photoAccessHelper.PhotoSelectOptions();
+    options.MIMEType = photoAccessHelper.PhotoViewMIMETypes.IMAGE_TYPE;
+    options.maxSelectNumber = 1;
+    new photoAccessHelper.PhotoViewPicker().select(options)
+      .then((result: photoAccessHelper.PhotoSelectResult) => {
+        if (result.photoUris.length === 0 || this.avatarStore === null) {
+          return;
+        }
+        try {
+          this.avatarPath = this.avatarStore.saveFromUri(result.photoUris[0]);
+          promptAction.showToast({ message: '头像已更新' });
+        } catch (err) {
+          console.error(`pickAvatar save failed: ${JSON.stringify(err)}`);
+          promptAction.showToast({ message: '头像保存失败，请重试' });
+        }
+      })
+      .catch((err: Error) => {
+        console.error(`pickAvatar failed: ${err.message}`);
+      });
   }
 
   private saveInjury(): void {
@@ -177,7 +210,7 @@ struct ProfilePage {
               })
               .accessibilityLevel('no')
             Row({ space: 16 }) {
-            // 渐变描边圆形头像框
+            // 渐变描边圆形头像框（点击从相册更换；图片存沙箱，无网络/权限）
             Stack() {
               Circle({ width: 72, height: 72 })
                 .fill(this.theme.palette.cardBackground)
@@ -186,14 +219,37 @@ struct ProfilePage {
                   colors: [[this.theme.palette.heroStart, 0.0], [this.theme.palette.heroEnd, 1.0]]
                 })
                 .accessibilityLevel('no')
-              Circle({ width: 64, height: 64 })
-                .fill(this.theme.palette.cardBackground)
-                .accessibilityLevel('no')
-              Text('👤')
-                .fontSize(28)
+              if (this.avatarPath.length > 0) {
+                Image(`file://${this.avatarPath}`)
+                  .width(64)
+                  .height(64)
+                  .borderRadius(32)
+                  .clip(true)
+                  .objectFit(ImageFit.Cover)
+                  .accessibilityLevel('no')
+              } else {
+                Circle({ width: 64, height: 64 })
+                  .fill(this.theme.palette.cardBackground)
+                  .accessibilityLevel('no')
+                Text('👤')
+                  .fontSize(28)
+                  .accessibilityLevel('no')
+              }
+              // 相机角标（提示可点击更换）
+              Text('📷')
+                .fontSize(10)
+                .width(22)
+                .height(22)
+                .borderRadius(11)
+                .backgroundColor(this.theme.palette.accent)
+                .textAlign(TextAlign.Center)
+                .translate({ x: 24, y: 24 })
                 .accessibilityLevel('no')
             }
-            .accessibilityText('用户头像')
+            .accessibilityText('用户头像，点击从相册更换')
+            .onClick(() => {
+              this.pickAvatar();
+            })
             Column({ space: 4 }) {
               Text(`${this.gender} · ${this.ageText} 岁 · ${this.weightText} kg`)
                 .fontSize(16)
