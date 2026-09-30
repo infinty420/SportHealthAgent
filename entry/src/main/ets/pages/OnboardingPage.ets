@@ -13,6 +13,22 @@ import { SectionCard } from '../components/SectionCard';
 import { UserProfileStore } from '../data/UserProfileStore';
 import { UserProfile, USER_GOAL_LIST, EXPERIENCE_LEVEL_LIST, GENDER_LIST } from '../model/UserProfile';
 
+/** 数值滑块参数（@Builder 按引用传参：按值传参不触发 UI 刷新，会导致标签/滑块卡死在初始值） */
+interface SliderSpec {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onSlide: (v: number) => void;
+}
+
+/** 选项 chips 参数（按引用传参，保证选中态实时刷新） */
+interface ChipsSpec {
+  options: string[];
+  current: string;
+  onPick: (v: string) => void;
+}
+
 @Entry
 @Component
 struct OnboardingPage {
@@ -61,20 +77,20 @@ struct OnboardingPage {
 
   /** 选项 chips 行（单选；选中项用强调色填充） */
   @Builder
-  private optionChips(options: string[], current: string, onPick: (v: string) => void): void {
+  private optionChips($$: ChipsSpec): void {
     Flex({ wrap: FlexWrap.Wrap }) {
-      ForEach(options, (option: string) => {
+      ForEach($$.options, (option: string) => {
         Text(option)
           .fontSize(14)
-          .fontColor(option === current ? this.theme.palette.onAccent : this.theme.palette.primaryText)
+          .fontColor(option === $$.current ? this.theme.palette.onAccent : this.theme.palette.primaryText)
           .textAlign(TextAlign.Center)
           .padding({ left: 18, right: 18, top: 8, bottom: 8 })
           .borderRadius(18)
-          .backgroundColor(option === current ? this.theme.palette.accent : this.theme.palette.inputBackground)
+          .backgroundColor(option === $$.current ? this.theme.palette.accent : this.theme.palette.inputBackground)
           .margin({ right: 10, bottom: 10 })
           .accessibilityText(`选择${option}`)
           .onClick(() => {
-            onPick(option);
+            $$.onPick(option);
           })
       }, (option: string): string => option)
     }
@@ -83,18 +99,18 @@ struct OnboardingPage {
 
   /** 数值滑块（标签实时显示当前值） */
   @Builder
-  private valueSlider(label: string, value: number, min: number, max: number, onSlide: (v: number) => void): void {
+  private valueSlider($$: SliderSpec): void {
     Column({ space: 2 }) {
-      Text(`${label}：${value}`)
+      Text(`${$$.label}：${$$.value}`)
         .fontSize(14)
         .fontColor(this.theme.palette.primaryText)
-      Slider({ value: value, min: min, max: max, step: 1 })
+      Slider({ value: $$.value, min: $$.min, max: $$.max, step: 1 })
         .selectedColor(this.theme.palette.accent)
         .trackColor(this.theme.palette.track)
         .blockColor(this.theme.palette.accent)
-        .accessibilityText(`调整${label}`)
+        .accessibilityText(`调整${$$.label}`)
         .onChange((v: number) => {
-          onSlide(Math.round(v));
+          $$.onSlide(Math.round(v));
         })
     }
     .alignItems(HorizontalAlign.Start)
@@ -135,40 +151,40 @@ struct OnboardingPage {
         Column() {
           if (this.step === 0) {
             SectionCard({ theme: this.theme, title: '第 1 步 · 性别' }) {
-              this.optionChips(GENDER_LIST, this.gender, (v: string) => {
+              this.optionChips({ options: GENDER_LIST, current: this.gender, onPick: (v: string) => {
                 this.gender = v;
-              })
+              } })
             }
           }
           if (this.step === 1) {
             SectionCard({ theme: this.theme, title: '第 2 步 · 年龄' }) {
-              this.valueSlider('年龄（岁）', this.age, 10, 100, (v: number) => {
+              this.valueSlider({ label: '年龄（岁）', value: this.age, min: 10, max: 100, onSlide: (v: number) => {
                 this.age = v;
-              })
+              } })
             }
           }
           if (this.step === 2) {
             SectionCard({ theme: this.theme, title: '第 3 步 · 身高体重' }) {
-              this.valueSlider('身高（厘米）', this.heightCm, 100, 230, (v: number) => {
+              this.valueSlider({ label: '身高（厘米）', value: this.heightCm, min: 100, max: 230, onSlide: (v: number) => {
                 this.heightCm = v;
-              })
-              this.valueSlider('体重（公斤）', this.weightKg, 30, 150, (v: number) => {
+              } })
+              this.valueSlider({ label: '体重（公斤）', value: this.weightKg, min: 30, max: 150, onSlide: (v: number) => {
                 this.weightKg = v;
-              })
+              } })
             }
           }
           if (this.step === 3) {
             SectionCard({ theme: this.theme, title: '第 4 步 · 训练目标' }) {
-              this.optionChips(USER_GOAL_LIST, this.goal, (v: string) => {
+              this.optionChips({ options: USER_GOAL_LIST, current: this.goal, onPick: (v: string) => {
                 this.goal = v;
-              })
+              } })
             }
           }
           if (this.step === 4) {
             SectionCard({ theme: this.theme, title: '第 5 步 · 训练经验' }) {
-              this.optionChips(EXPERIENCE_LEVEL_LIST, this.experienceLevel, (v: string) => {
+              this.optionChips({ options: EXPERIENCE_LEVEL_LIST, current: this.experienceLevel, onPick: (v: string) => {
                 this.experienceLevel = v;
-              })
+              } })
               Text('经验等级影响引擎的强度与容量建议：新手更保守，高阶更激进')
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)

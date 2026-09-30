@@ -74,6 +74,13 @@ interface ReadinessRef {
   report: ReadinessReport;
 }
 
+/** 1–5 评分选择参数（@Builder 按引用传参：按值传参不触发 UI 刷新，点选高亮会卡死） */
+interface RateSpec {
+  label: string;
+  current: number;
+  onPick: (v: number) => void;
+}
+
 @Entry
 @Component
 struct Index {
@@ -1367,15 +1374,15 @@ struct Index {
             .width('100%')
             Row({ space: 10 }) {
               Column() {
-                this.rateSelect('睡眠质量', this.sleepQuality, (v: number) => {
+                this.rateSelect({ label: '睡眠质量', current: this.sleepQuality, onPick: (v: number) => {
                   this.sleepQuality = v;
-                })
+                } })
               }
               .layoutWeight(1)
               Column() {
-                this.rateSelect('酸痛程度', this.soreness, (v: number) => {
+                this.rateSelect({ label: '酸痛程度', current: this.soreness, onPick: (v: number) => {
                   this.soreness = v;
-                })
+                } })
               }
               .layoutWeight(1)
             }
@@ -2600,26 +2607,26 @@ struct Index {
 
   /** 1–5 评分选择（睡眠质量/酸痛程度共用） */
   @Builder
-  private rateSelect(label: string, current: number, onPick: (v: number) => void): void {
+  private rateSelect($$: RateSpec): void {
     Column({ space: 4 }) {
-      Text(label)
+      Text($$.label)
         .fontSize(13)
         .fontColor(this.theme.palette.secondaryText)
       Row({ space: 6 }) {
         ForEach(this.rateOptions, (option: string) => {
           Text(option)
             .fontSize(13)
-            .fontColor(`${current}` === option ?
+            .fontColor(`${$$.current}` === option ?
               this.theme.palette.onAccent : this.theme.palette.primaryText)
             .textAlign(TextAlign.Center)
             .layoutWeight(1)
             .height(30)
             .borderRadius(8)
-            .backgroundColor(`${current}` === option ?
+            .backgroundColor(`${$$.current}` === option ?
               this.theme.palette.accent : this.theme.palette.inputBackground)
-            .accessibilityText(`${label} ${option} 分`)
+            .accessibilityText(`${$$.label} ${option} 分`)
             .onClick(() => {
-              onPick(Number(option));
+              $$.onPick(Number(option));
             })
         }, (option: string) => option)
       }
