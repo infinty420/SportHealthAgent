@@ -131,6 +131,8 @@ struct Index {
   private mesoCtx: CanvasRenderingContext2D = new CanvasRenderingContext2D(new RenderingContextSettings(true));
   /** 计划模板库（3.3：一键生成中周期） */
   private readonly planTemplates: PlanTemplate[] = PlanTemplates.all();
+  /** 训练页模板库折叠状态（小按键点击展开） */
+  @State showPlanTemplates: boolean = false;
 
   // 本周肌群容量热力（按部位有效组数；Canvas 人体色块直读）
   @State heatChest: number = 0;
@@ -1922,6 +1924,59 @@ struct Index {
           // 分析结果已改为独立页面展示：点击「开始分析 / 模拟数据 / 读取手表」后
           // 跳转 pages/AnalysisResultPage（见 openAnalysisResult）
 
+          // ===== 计划模板库（折叠入口：小按键点击展开；自计划页迁入训练页底部） =====
+          Button(this.showPlanTemplates ? '▲ 收起计划模板库' : '📋 计划模板库（点击展开）')
+            .fontSize(13)
+            .fontColor(this.theme.palette.accent)
+            .backgroundColor(this.theme.palette.inputBackground)
+            .borderRadius(18)
+            .height(36)
+            .width('100%')
+            .margin({ top: 4 })
+            .accessibilityText('展开或收起计划模板库')
+            .accessibilityDescription(this.showPlanTemplates ? '当前已展开' : '当前已收起')
+            .onClick(() => {
+              this.showPlanTemplates = !this.showPlanTemplates;
+            })
+          if (this.showPlanTemplates) {
+            SectionCard({ theme: this.theme, title: '计划模板库', iconRes: 'app.media.ic_plan', accentTone: 'orange' }) {
+              ForEach(this.planTemplates, (template: PlanTemplate) => {
+                Row({ space: 10 }) {
+                  Column({ space: 3 }) {
+                    Text(`${template.name} · 每周 ${template.daysPerWeek} 练 · ${template.lengthWeeks} 周`)
+                      .fontSize(14)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(this.theme.palette.primaryText)
+                    Text(`${template.split.join(' → ')}｜适合：${template.audience}`)
+                      .fontSize(11)
+                      .fontColor(this.theme.palette.secondaryText)
+                      .lineHeight(16)
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
+                  Button(this.mesoTemplate === template.name ? '使用中' : '一键生成')
+                    .fontSize(12)
+                    .fontColor(this.mesoTemplate === template.name ?
+                      this.theme.palette.secondaryText : this.theme.palette.onAccent)
+                    .backgroundColor(this.mesoTemplate === template.name ?
+                      this.theme.palette.inputBackground : this.theme.palette.accent)
+                    .borderRadius(16)
+                    .height(32)
+                    .accessibilityText(`套用模板 ${template.name}`)
+                    .onClick(() => {
+                      this.applyTemplate(template);
+                    })
+                }
+                .width('100%')
+                .padding({ top: 8, bottom: 8 })
+              }, (template: PlanTemplate) => template.id)
+              Text('生成后重置「本中周期进度」为新模板的第 1 周；分化安排详见首页中周期卡')
+                .fontSize(11)
+                .fontColor(this.theme.palette.secondaryText)
+                .lineHeight(16)
+            }
+          }
+
         }
         .padding({ left: 16, right: 16 })
       }
@@ -1989,43 +2044,7 @@ struct Index {
             }
           }
 
-          // ===== 计划模板库（3.3：5 套内置模板，一键生成中周期） =====
-          SectionCard({ theme: this.theme, title: '计划模板库', iconRes: 'app.media.ic_plan', accentTone: 'orange' }) {
-            ForEach(this.planTemplates, (template: PlanTemplate) => {
-              Row({ space: 10 }) {
-                Column({ space: 3 }) {
-                  Text(`${template.name} · 每周 ${template.daysPerWeek} 练 · ${template.lengthWeeks} 周`)
-                    .fontSize(14)
-                    .fontWeight(FontWeight.Medium)
-                    .fontColor(this.theme.palette.primaryText)
-                  Text(`${template.split.join(' → ')}｜适合：${template.audience}`)
-                    .fontSize(11)
-                    .fontColor(this.theme.palette.secondaryText)
-                    .lineHeight(16)
-                }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-                Button(this.mesoTemplate === template.name ? '使用中' : '一键生成')
-                  .fontSize(12)
-                  .fontColor(this.mesoTemplate === template.name ?
-                    this.theme.palette.secondaryText : this.theme.palette.onAccent)
-                  .backgroundColor(this.mesoTemplate === template.name ?
-                    this.theme.palette.inputBackground : this.theme.palette.accent)
-                  .borderRadius(16)
-                  .height(32)
-                  .accessibilityText(`套用模板 ${template.name}`)
-                  .onClick(() => {
-                    this.applyTemplate(template);
-                  })
-              }
-              .width('100%')
-              .padding({ top: 8, bottom: 8 })
-            }, (template: PlanTemplate) => template.id)
-            Text('生成后重置「本中周期进度」为新模板的第 1 周；分化安排详见首页中周期卡')
-              .fontSize(11)
-              .fontColor(this.theme.palette.secondaryText)
-              .lineHeight(16)
-          }
+          // ===== 计划模板库已迁入训练页底部（折叠小按键，点击展开） =====
 
           // ===== 规则设置 =====
           SectionCard({ theme: this.theme, title: '规则设置（端侧参数，实时生效）' }) {
