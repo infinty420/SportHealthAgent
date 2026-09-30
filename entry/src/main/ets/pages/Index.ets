@@ -133,6 +133,8 @@ struct Index {
   private readonly planTemplates: PlanTemplate[] = PlanTemplates.all();
   /** 训练页模板库折叠状态（小按键点击展开） */
   @State showPlanTemplates: boolean = false;
+  /** 计划页规则设置折叠状态（小按键点击展开） */
+  @State showRuleConfig: boolean = false;
 
   // 本周肌群容量热力（按部位有效组数；Canvas 人体色块直读）
   @State heatChest: number = 0;
@@ -2046,7 +2048,21 @@ struct Index {
 
           // ===== 计划模板库已迁入训练页底部（折叠小按键，点击展开） =====
 
-          // ===== 规则设置 =====
+          // ===== 规则设置（折叠小按键，点击展开；与训练页模板库同一交互） =====
+          Button(this.showRuleConfig ? '▲ 收起规则设置' : '⚙️ 规则设置（点击展开）')
+            .fontSize(13)
+            .fontColor(this.theme.palette.accent)
+            .backgroundColor(this.theme.palette.inputBackground)
+            .borderRadius(18)
+            .height(36)
+            .width('100%')
+            .margin({ top: 4 })
+            .accessibilityText('展开或收起规则设置')
+            .accessibilityDescription(this.showRuleConfig ? '当前已展开' : '当前已收起')
+            .onClick(() => {
+              this.showRuleConfig = !this.showRuleConfig;
+            })
+          if (this.showRuleConfig) {
           SectionCard({ theme: this.theme, title: '规则设置（端侧参数，实时生效）' }) {
             this.configSlider({
               label: `超标阈值：${this.highThreshold}`, value: this.highThreshold, min: 60, max: 90,
@@ -2226,6 +2242,7 @@ struct Index {
                 .fontColor(this.theme.palette.success)
                 .margin({ top: 4 })
             }
+          }
           }
         }
         .padding({ left: 16, right: 16 })
