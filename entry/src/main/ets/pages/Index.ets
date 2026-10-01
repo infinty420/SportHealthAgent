@@ -488,6 +488,31 @@ struct Index {
       `今日按${this.isTrainingDay ? '训练日' : '非训练日'}执行`;
   }
 
+  /** 餐时机文案拆分：标题（首个冒号前），无冒号时整行作标题 */
+  private timingTitle(line: string): string {
+    const i: number = line.indexOf('：');
+    return i > 0 ? line.substring(0, i) : line;
+  }
+
+  /** 餐时机文案拆分：细节（首个冒号后） */
+  private timingDetail(line: string): string {
+    const i: number = line.indexOf('：');
+    return i > 0 ? line.substring(i + 1) : '';
+  }
+
+  /** 碳水循环主行（去掉「碳水循环：」前缀与今日执行后缀） */
+  private carbMain(): string {
+    const noPrefix: string = this.carbLine.replace('碳水循环：', '');
+    const i: number = noPrefix.indexOf('· ');
+    return i > 0 ? noPrefix.substring(0, i) : noPrefix;
+  }
+
+  /** 碳水循环今日行（「· 」后的执行提示） */
+  private carbToday(): string {
+    const i: number = this.carbLine.indexOf('· ');
+    return i > 0 ? this.carbLine.substring(i + 2) : '';
+  }
+
   /** 中周期双折线：容量%（强调色）+ 强度%（成功色），减载周警告色圆点，已完成周实色、未来周半透明 */
   private drawMesocycle(): void {
     const ctx: CanvasRenderingContext2D = this.mesoCtx;
@@ -1605,33 +1630,53 @@ struct Index {
           if (this.timingLines.length > 0) {
             SectionCard({ theme: this.theme, title: '餐时机与碳水循环', iconRes: 'app.media.ic_diet', accentTone: 'orange' }) {
               ForEach(this.timingLines, (line: string, idx: number) => {
-                Row({ space: 10 }) {
-                  Column({ space: 3 }) {
-                    Circle({ width: 8, height: 8 })
+                Row({ space: 12 }) {
+                  Column({ space: 4 }) {
+                    Circle({ width: 10, height: 10 })
                       .fill(this.theme.palette.accent)
                     // 时间轴连接线：固定高度，避免 layoutWeight 在滚动容器里无限拉伸
                     Row()
                       .width(2)
-                      .height(14)
+                      .height(26)
                       .backgroundColor(idx === this.timingLines.length - 1 ?
                         this.theme.palette.cardBackground : this.theme.palette.track)
                   }
-                  .width(8)
+                  .width(10)
                   .alignItems(HorizontalAlign.Center)
-                  Text(line)
-                    .fontSize(12)
-                    .fontColor(this.theme.palette.primaryText)
-                    .lineHeight(18)
-                    .layoutWeight(1)
+                  .margin({ top: 3 })
+                  // 每条拆成「短标题 + 细节行」，留白拉开，避免整段密排
+                  Column({ space: 4 }) {
+                    Text(this.timingTitle(line))
+                      .fontSize(14)
+                      .fontWeight(FontWeight.Medium)
+                      .fontColor(this.theme.palette.primaryText)
+                    Text(this.timingDetail(line))
+                      .fontSize(12)
+                      .fontColor(this.theme.palette.secondaryText)
+                      .lineHeight(19)
+                  }
+                  .alignItems(HorizontalAlign.Start)
+                  .layoutWeight(1)
                 }
                 .width('100%')
                 .alignItems(VerticalAlign.Top)
-                .margin({ bottom: 6 })
+                .margin({ bottom: 14 })
               }, (line: string, idx: number): string => `${idx}-${line}`)
-              Text(this.carbLine)
-                .fontSize(12)
+              // 碳水循环：与上方时间轴之间加分隔线，两行分开放
+              Row()
+                .width('100%')
+                .height(1)
+                .backgroundColor(this.theme.palette.track)
+                .margin({ bottom: 10 })
+                .accessibilityLevel('no')
+              Text(this.carbMain())
+                .fontSize(13)
+                .fontWeight(FontWeight.Medium)
+                .fontColor(this.theme.palette.primaryText)
+                .lineHeight(19)
+              Text(this.carbToday())
+                .fontSize(11)
                 .fontColor(this.theme.palette.accent)
-                .lineHeight(17)
                 .margin({ top: 4 })
             }
           }
