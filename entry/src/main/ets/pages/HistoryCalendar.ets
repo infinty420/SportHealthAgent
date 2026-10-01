@@ -504,12 +504,12 @@ export struct HistoryCalendar {
   private drawHeat(): void {
     const ctx: CanvasRenderingContext2D = this.heatCtx;
     ctx.clearRect(0, 0, 320, 190);
-    // 图注（与底图两个人体居中对齐）
+    // 图注：放在各人体左侧空档，避免压住头部看不清
     ctx.fillStyle = this.theme.palette.secondaryText;
     ctx.font = this.canvasFont(12, false);
-    ctx.textAlign = 'center';
-    ctx.fillText('正面', 100, 12);
-    ctx.fillText('背面', 220, 12);
+    ctx.textAlign = 'right';
+    ctx.fillText('正面', 49, 24);
+    ctx.fillText('背面', 166, 24);
     // 命中区域每次重绘重建
     this.heatHitMap.clear();
     this.drawSpots(ctx, BodyPathData.getFrontSpots(), 100);
