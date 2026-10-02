@@ -25,6 +25,13 @@ export struct BackgroundLayer {
         .objectFit(ImageFit.Cover)
         .opacity(this.theme.mode === 'light' ? 1 : 0)
         .animation({ duration: 200, curve: Curve.EaseOut })
+      // 圆点平铺纹理：极淡 accent 着色，铺在卡片间隙的空白处，避免界面单调
+      Image($r('app.media.pattern_dot'))
+        .width('100%')
+        .height('100%')
+        .objectRepeat(ImageRepeat.XY)
+        .fillColor(this.theme.palette.accent)
+        .opacity(0.05)
     }
     .width('100%')
     .height('100%')

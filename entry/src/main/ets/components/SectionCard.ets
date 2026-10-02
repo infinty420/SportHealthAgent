@@ -28,8 +28,23 @@ export struct SectionCard {
   /** 入场动效标记：onAppear 后 250ms 淡入上滑 */
   @State private entered: boolean = false;
 
+  /** tone → 语义色（右下角水印着色基准，与 StatCard 一致） */
+  private toneColor(): string {
+    if (this.accentTone === 'green') {
+      return this.theme.palette.success;
+    }
+    if (this.accentTone === 'orange') {
+      return this.theme.palette.warning;
+    }
+    if (this.accentTone === 'red') {
+      return this.theme.palette.danger;
+    }
+    return this.theme.palette.accent;
+  }
+
   build() {
-    Column() {
+    Stack() {
+      Column() {
       Row({ space: 8 }) {
         if (this.iconRes.length > 0) {
           // 36×36 软底图标徽章（tone 取 *Soft/语义色）
@@ -64,6 +79,23 @@ export struct SectionCard {
         SoftGlowUtil.transparentColors(this.theme.palette.accentGlow ?? this.theme.palette.cardBackground)
     })
     .shadow({ radius: 10, color: this.theme.palette.cardShadow, offsetX: 0, offsetY: 2 })
+      // 右下角图标水印：tone 语义色极淡着色，旋转+外移一部分，被圆角裁切，填补卡片空白
+      if (this.iconRes.length > 0) {
+        Image($r(this.iconRes))
+          .width(72)
+          .height(72)
+          .fillColor(this.toneColor())
+          .opacity(0.05)
+          .rotate({ angle: -12 })
+          .translate({ x: 14, y: 14 })
+          .accessibilityLevel('no')
+          .hitTestBehavior(HitTestMode.None)
+      }
+    }
+    .alignContent(Alignment.BottomEnd)
+    .width('100%')
+    .borderRadius(20)
+    .clip(true)
     .margin({ bottom: 14 })
     .opacity(this.entered ? 1 : 0)
     .translate({ x: 0, y: this.entered ? 0 : 16 })
