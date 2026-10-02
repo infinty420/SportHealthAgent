@@ -4,9 +4,9 @@
  * 可视化 UI 层 · 发现
  * 0. 个人头版：hero 渐变全宽头版（圆角下摆），头像 + 目标·等级 + 加入日期 +
  *    总时长/累计练习天/累计重量三统计（参考快练发现页；不含任何付费/会员元素）；
- * 1. 训练历史：月日历（周一开头，含邻月补齐灰格，支持翻月），有训练的日子标圆点；
- * 2. 当日明细：选中日期的动作列表、组数/容量汇总与当日破纪录事件（PR 按天分类）；
- * 3. 数据统计：周/月/年切换 + 范围翻页，
+ * 1. 训练历史：月日历（周一开头，含邻月补齐灰格，支持翻月），有训练的日子标圆点，
+ *    点击某天跳转「当日明细」独立页（pages/DayDetailPage）；
+ * 2. 数据统计：周/月/年切换 + 范围翻页，
  *    部位频次人体热力、部位组数环形图、训练时长环比、分部位容量卡。
  * 数据全部来自本地 WorkoutLogStore / HistoryStore，确定性规则聚合，无网络请求。
  * 主题约束：本文件不出现任何硬编码色值，一律读取 theme.palette.*。
@@ -26,7 +26,6 @@ import { HistoryEntry, HistoryStore } from '../data/HistoryStore';
 import { AvatarStore } from '../data/AvatarStore';
 import { UserProfile } from '../model/UserProfile';
 import { UserProfileStore } from '../data/UserProfileStore';
-import { PRTracker, DailyPREvent } from '../agent/rules/PRTracker';
 import {
   TrainingStatsAggregator, StatsPeriod, StatsRange, MuscleStat, VolumeBestDay, HEAT_MUSCLE_GROUPS
 } from '../agent/rules/TrainingStatsAggregator';
@@ -81,8 +80,6 @@ export struct HistoryCalendar {
   @State private historyEntries: HistoryEntry[] = [];
   /** 日期 → 日志条数（日历圆点） */
   private dateCounts: Map<string, number> = new Map<string, number>();
-  /** 日期 → 当日破纪录事件 */
-  private prByDate: Map<string, DailyPREvent[]> = new Map<string, DailyPREvent[]>();
 
   // ===== 日历状态 =====
   @State private calYear: number = 2026;
@@ -93,10 +90,7 @@ export struct HistoryCalendar {
   private readonly weekHeaders: string[] = ['一', '二', '三', '四', '五', '六', '日'];
   private readonly periodModes: string[] = ['week', 'month', 'year'];
 
-  // ===== 当日明细 =====
-  @State private dayLogs: WorkoutLog[] = [];
-  @State private dayVolume: number = 0;
-  @State private dayPRs: DailyPREvent[] = [];
+  // ===== 当日明细（已迁独立页 DayDetailPage，日历点击跳转） =====
 
   // ===== 数据统计 =====
   @State private periodMode: StatsPeriod = 'week';
@@ -167,17 +161,8 @@ export struct HistoryCalendar {
       counts.set(key, (counts.get(key) ?? 0) + 1);
     });
     this.dateCounts = counts;
-    const events: DailyPREvent[] = PRTracker.dailyPREvents(this.allLogs);
-    const grouped: Map<string, DailyPREvent[]> = new Map<string, DailyPREvent[]>();
-    events.forEach((event: DailyPREvent) => {
-      const bucket: DailyPREvent[] = grouped.get(event.dateKey) ?? [];
-      bucket.push(event);
-      grouped.set(event.dateKey, bucket);
-    });
-    this.prByDate = grouped;
     this.refreshHero();
     this.rebuildCalendar();
-    this.refreshDayDetail();
     this.refreshStats();
   }
 
@@ -279,43 +264,12 @@ export struct HistoryCalendar {
     }
     this.selectedDateKey = cell.dateKey;
     this.rebuildCalendar();
-    this.refreshDayDetail();
+    // 当日明细已迁独立页：点击某天直接跳转
+    router.pushUrl({ url: 'pages/DayDetailPage', params: { dateKey: cell.dateKey } });
   }
 
-  // ==================== 当日明细 ====================
-
-  private refreshDayDetail(): void {
-    if (this.logStore === null) {
-      return;
-    }
-    const logs: WorkoutLog[] = this.logStore.listByDate(this.selectedDateKey);
-    this.dayLogs = logs;
-    let volume: number = 0;
-    logs.forEach((log: WorkoutLog) => {
-      volume += log.totalVolume();
-    });
-    this.dayVolume = volume;
-    this.dayPRs = this.prByDate.get(this.selectedDateKey) ?? [];
-  }
-
-  /** 日志行摘要：动作名 + 组数/次数/容量 */
-  private logSummary(log: WorkoutLog): string {
-    const item: ExerciseItem | null = ExerciseLibrary.findById(log.exerciseId);
-    const name: string = item === null ? log.exerciseId : item.name;
-    const volume: number = log.totalVolume();
-    if (volume > 0) {
-      return `${name} · ${log.sets.length} 组 · 总次数 ${log.totalReps()} · 容量 ${volume} kg`;
-    }
-    return `${name} · ${log.sets.length} 组 · 总次数 ${log.totalReps()}`;
-  }
-
-  private logMuscleTag(log: WorkoutLog): string {
-    const item: ExerciseItem | null = ExerciseLibrary.findById(log.exerciseId);
-    if (item === null) {
-      return '';
-    }
-    return `${item.muscle}·${item.subMuscle}`;
-  }
+  // ==================== 当日明细（独立页） ====================
+  // 当日明细功能已迁移至 pages/DayDetailPage，日历点击跳转，本页不再内嵌。
 
   // ==================== 数据统计 ====================
 
@@ -799,47 +753,7 @@ export struct HistoryCalendar {
             .width('100%')
           }
 
-          // ===== 当日明细（含当日 PR） =====
-          SectionCard({ theme: this.theme, title: `当日明细 · ${this.selectedDateKey}` }) {
-            if (this.dayLogs.length === 0) {
-              Text('当日暂无训练记录')
-                .fontSize(13)
-                .fontColor(this.theme.palette.secondaryText)
-            } else {
-              ForEach(this.dayLogs, (log: WorkoutLog) => {
-                Row() {
-                  Column({ space: 2 }) {
-                    Text(this.logSummary(log))
-                      .fontSize(13)
-                      .fontColor(this.theme.palette.primaryText)
-                    Text(this.logMuscleTag(log))
-                      .fontSize(11)
-                      .fontColor(this.theme.palette.secondaryText)
-                  }
-                  .alignItems(HorizontalAlign.Start)
-                  .layoutWeight(1)
-                }
-                .width('100%')
-                .padding({ top: 6, bottom: 6 })
-              }, (log: WorkoutLog) => `${log.timestamp}-${log.exerciseId}`)
-              if (this.dayVolume > 0) {
-                Text(`当日总容量：${this.dayVolume} kg`)
-                  .fontSize(13)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor(this.theme.palette.accent)
-                  .margin({ top: 4 })
-              }
-            }
-            if (this.dayPRs.length > 0) {
-              ForEach(this.dayPRs, (event: DailyPREvent) => {
-                Text(`🏅 ${event.exerciseName}：${event.message}`)
-                  .fontSize(12)
-                  .fontColor(this.theme.palette.warning)
-                  .lineHeight(17)
-                  .margin({ top: 6 })
-              }, (event: DailyPREvent) => `${event.dateKey}-${event.exerciseName}-${event.message}`)
-            }
-          }
+          // ===== 当日明细已迁独立页：点击日历某天跳转 DayDetailPage =====
 
           // ===== 数据统计 =====
           SectionCard({ theme: this.theme, title: '数据统计' }) {

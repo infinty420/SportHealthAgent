@@ -2,6 +2,7 @@
   "src": [
     "pages/Index",
     "pages/AnalysisResultPage",
+    "pages/DayDetailPage",
     "pages/ExerciseDetail",
     "pages/FoodPicker",
     "pages/Report",
