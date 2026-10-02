@@ -56,6 +56,12 @@ interface ReportCalCell {
   isToday: boolean;
 }
 
+/** What-if 卡片入参（$$ 对象字面量传参，保证点击后刷新） */
+interface WhatIfCardParam {
+  /** 模拟结果（null 表示未运行） */
+  result: WhatIfResult | null;
+}
+
 @Entry
 @Component
 struct ReportPage {
@@ -731,7 +737,7 @@ struct ReportPage {
           this.calendarPrCard()
           this.badgeCard()
           this.insightCard()
-          this.whatIfCard(this.whatIfResult)
+          this.whatIfCard({ result: this.whatIfResult })
         }
         .padding({ left: 16, right: 16, bottom: 24 })
       }
@@ -1010,9 +1016,9 @@ struct ReportPage {
     }
   }
 
-  /** What-if 情景模拟卡（参数局部收窄） */
+  /** What-if 情景模拟卡（参数局部收窄；$$ 对象字面量传参保证点击后刷新） */
   @Builder
-  private whatIfCard(result: WhatIfResult | null): void {
+  private whatIfCard($$: WhatIfCardParam): void {
     SectionCard({ theme: this.theme, title: 'What-if 情景模拟' }) {
       if (this.currentWeightKg <= 0) {
         Text('先在画像页填体重')
@@ -1025,7 +1031,7 @@ struct ReportPage {
             Text('每周训练次数')
               .fontSize(12)
               .fontColor(this.theme.palette.secondaryText)
-            TextInput({ text: this.whatIfSessionsText })
+            TextInput({ text: this.whatIfSessionsText, placeholder: '如 4' })
               .type(InputType.Number)
               .fontColor(this.theme.palette.primaryText)
               .backgroundColor(this.theme.palette.inputBackground)
@@ -1040,8 +1046,8 @@ struct ReportPage {
             Text('每日热量增减（kcal）')
               .fontSize(12)
               .fontColor(this.theme.palette.secondaryText)
-            TextInput({ text: this.whatIfCalorieText })
-              .type(InputType.Number)
+            TextInput({ text: this.whatIfCalorieText, placeholder: '负数为缺口，如 -300' })
+              .type(InputType.Normal)
               .fontColor(this.theme.palette.primaryText)
               .backgroundColor(this.theme.palette.inputBackground)
               .borderRadius(8)
@@ -1065,13 +1071,13 @@ struct ReportPage {
           .onClick(() => {
             this.runWhatIf();
           })
-        if (result !== null) {
-          Text(result.note)
+        if ($$.result !== null) {
+          Text($$.result.note)
             .fontSize(13)
             .fontColor(this.theme.palette.primaryText)
             .lineHeight(18)
             .margin({ top: 10 })
-          Text(`负荷累积：4 周 ${result.load4Week} · 8 周 ${result.load8Week}` +
+          Text(`负荷累积：4 周 ${$$.result.load4Week} · 8 周 ${$$.result.load8Week}` +
             `（基于单次平均负荷 ${this.avgSessionLoad}）`)
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
