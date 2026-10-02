@@ -56,12 +56,6 @@ interface ReportCalCell {
   isToday: boolean;
 }
 
-/** What-if 卡片入参（$$ 对象字面量传参，保证点击后刷新） */
-interface WhatIfCardParam {
-  /** 模拟结果（null 表示未运行） */
-  result: WhatIfResult | null;
-}
-
 @Entry
 @Component
 struct ReportPage {
@@ -737,7 +731,7 @@ struct ReportPage {
           this.calendarPrCard()
           this.badgeCard()
           this.insightCard()
-          this.whatIfCard({ result: this.whatIfResult })
+          this.whatIfCard()
         }
         .padding({ left: 16, right: 16, bottom: 24 })
       }
@@ -1016,9 +1010,9 @@ struct ReportPage {
     }
   }
 
-  /** What-if 情景模拟卡（参数局部收窄；$$ 对象字面量传参保证点击后刷新） */
+  /** What-if 情景模拟卡（无参 Builder，直接读 this.whatIfResult，点击/输入即刷新） */
   @Builder
-  private whatIfCard($$: WhatIfCardParam): void {
+  private whatIfCard(): void {
     SectionCard({ theme: this.theme, title: 'What-if 情景模拟' }) {
       if (this.currentWeightKg <= 0) {
         Text('先在画像页填体重')
@@ -1039,6 +1033,7 @@ struct ReportPage {
               .accessibilityText('假设的每周训练次数')
               .onChange((v: string) => {
                 this.whatIfSessionsText = v;
+                this.runWhatIf();
               })
           }
           .layoutWeight(1)
@@ -1054,6 +1049,7 @@ struct ReportPage {
               .accessibilityText('假设的每日热量增减，负数为缺口')
               .onChange((v: string) => {
                 this.whatIfCalorieText = v;
+                this.runWhatIf();
               })
           }
           .layoutWeight(1)
@@ -1071,13 +1067,13 @@ struct ReportPage {
           .onClick(() => {
             this.runWhatIf();
           })
-        if ($$.result !== null) {
-          Text($$.result.note)
+        if (this.whatIfResult !== null) {
+          Text(this.whatIfResult.note)
             .fontSize(13)
             .fontColor(this.theme.palette.primaryText)
             .lineHeight(18)
             .margin({ top: 10 })
-          Text(`负荷累积：4 周 ${$$.result.load4Week} · 8 周 ${$$.result.load8Week}` +
+          Text(`负荷累积：4 周 ${this.whatIfResult.load4Week} · 8 周 ${this.whatIfResult.load8Week}` +
             `（基于单次平均负荷 ${this.avgSessionLoad}）`)
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
