@@ -67,6 +67,12 @@ export interface Palette {
   fatSoft?: string;
   /** 强调卡底色（可选；比 cardBackground 略亮/略暗一档，用于用户信息卡等强调位） */
   cardElevated?: string;
+  /** 页面背景渐变·起始（可选；绿系极浅色/深色，供 BackgroundLayer 三段渐变） */
+  bgGradStart?: string;
+  /** 页面背景渐变·中段（可选；橙系） */
+  bgGradMid?: string;
+  /** 页面背景渐变·结束（可选；红系） */
+  bgGradEnd?: string;
 }
 
 export type ThemeMode = 'light' | 'dark';
@@ -118,7 +124,10 @@ export class ThemeManager {
     proteinSoft: '#1FE5484D',
     carbSoft: '#1F3D6BFF',
     fatSoft: '#1FE8A13A',
-    cardElevated: '#F7F9FC'
+    cardElevated: '#F7F9FC',
+    bgGradStart: '#E9F6EE',
+    bgGradMid: '#FBF2E4',
+    bgGradEnd: '#FBEAEA'
   };
 
   /** 深色调色板（全应用深色颜色唯一定义处） */
@@ -153,7 +162,10 @@ export class ThemeManager {
     proteinSoft: '#33FF6B70',
     carbSoft: '#335B8DEF',
     fatSoft: '#33F2B75C',
-    cardElevated: '#22262B'
+    cardElevated: '#22262B',
+    bgGradStart: '#0E1B15',
+    bgGradMid: '#1B1610',
+    bgGradEnd: '#1D1214'
   };
 
   /** 当前生效的调色板：组件一律通过 theme.palette.* 取色 */
