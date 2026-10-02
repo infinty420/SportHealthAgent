@@ -2,6 +2,8 @@
  * 文件标注：AI 生成 —— 发现页：训练历史日历 + 按天明细 + 数据统计（通用 UI 脚手架）
  *
  * 可视化 UI 层 · 发现
+ * 0. 个人头版：hero 渐变全宽头版（圆角下摆），头像 + 目标·等级 + 加入日期 +
+ *    总时长/累计练习天/累计重量三统计（参考快练发现页；不含任何付费/会员元素）；
  * 1. 训练历史：月日历（周一开头，含邻月补齐灰格，支持翻月），有训练的日子标圆点；
  * 2. 当日明细：选中日期的动作列表、组数/容量汇总与当日破纪录事件（PR 按天分类）；
  * 3. 数据统计：周/月/年切换 + 范围翻页，
@@ -10,6 +12,7 @@
  * 主题约束：本文件不出现任何硬编码色值，一律读取 theme.palette.*。
  */
 import { common } from '@kit.AbilityKit';
+import { router } from '@kit.ArkUI';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { HeatColorUtil } from '../utils/HeatColorUtil';
@@ -20,6 +23,9 @@ import { ExerciseItem, ExerciseLibrary } from '../data/ExerciseLibrary';
 import { WorkoutLog } from '../model/WorkoutLog';
 import { WorkoutLogStore } from '../data/WorkoutLogStore';
 import { HistoryEntry, HistoryStore } from '../data/HistoryStore';
+import { AvatarStore } from '../data/AvatarStore';
+import { UserProfile } from '../model/UserProfile';
+import { UserProfileStore } from '../data/UserProfileStore';
 import { PRTracker, DailyPREvent } from '../agent/rules/PRTracker';
 import {
   TrainingStatsAggregator, StatsPeriod, StatsRange, MuscleStat, VolumeBestDay, HEAT_MUSCLE_GROUPS
@@ -57,6 +63,16 @@ export struct HistoryCalendar {
   @Prop @Watch('reloadAll') refreshTick: number = 0;
   private logStore: WorkoutLogStore | null = null;
   private historyStore: HistoryStore | null = null;
+  private avatarStore: AvatarStore | null = null;
+  private profileStore: UserProfileStore | null = null;
+
+  // ===== 个人头版 =====
+  @State private avatarPath: string = '';
+  @State private goalLevelText: string = '';
+  @State private joinLineText: string = '';
+  @State private totalMin: number = 0;
+  @State private totalDays: number = 0;
+  @State private totalTons: string = '0.0';
 
   // ===== 原始数据 =====
   @State private allLogs: WorkoutLog[] = [];
@@ -118,6 +134,8 @@ export struct HistoryCalendar {
     const context: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
     this.logStore = new WorkoutLogStore(context);
     this.historyStore = new HistoryStore(context);
+    this.avatarStore = new AvatarStore(context);
+    this.profileStore = new UserProfileStore(context);
     const now: Date = new Date();
     this.calYear = now.getFullYear();
     this.calMonth = now.getMonth();
@@ -155,9 +173,41 @@ export struct HistoryCalendar {
       grouped.set(event.dateKey, bucket);
     });
     this.prByDate = grouped;
+    this.refreshHero();
     this.rebuildCalendar();
     this.refreshDayDetail();
     this.refreshStats();
+  }
+
+  // ==================== 个人头版 ====================
+
+  /** 头版数据：头像 + 目标·等级 + 加入日期 + 总时长/练习天/累计重量 */
+  private refreshHero(): void {
+    this.avatarPath = this.avatarStore === null ? '' : this.avatarStore.load();
+    const profile: UserProfile = this.profileStore === null ? new UserProfile() : this.profileStore.load();
+    this.goalLevelText = `${profile.goal} · ${profile.experienceLevel}`;
+    let minutes: number = 0;
+    let volumeKg: number = 0;
+    let earliest: number = 0;
+    const daySet: Set<string> = new Set<string>();
+    this.historyEntries.forEach((entry: HistoryEntry) => {
+      minutes += entry.durationMin;
+      daySet.add(HistoryCalendar.dateKeyOf(entry.timestamp));
+      if (earliest === 0 || entry.timestamp < earliest) {
+        earliest = entry.timestamp;
+      }
+    });
+    this.allLogs.forEach((log: WorkoutLog) => {
+      daySet.add(log.dateKey());
+      volumeKg += log.totalVolume();
+      if (earliest === 0 || log.timestamp < earliest) {
+        earliest = log.timestamp;
+      }
+    });
+    this.totalMin = minutes;
+    this.totalDays = daySet.size;
+    this.totalTons = (volumeKg / 1000).toFixed(1);
+    this.joinLineText = earliest > 0 ? `加入衡练 ${HistoryCalendar.dateKeyOf(earliest)}` : '开始你的第一次训练';
   }
 
   // ==================== 日历 ====================
@@ -653,20 +703,11 @@ export struct HistoryCalendar {
 
   build() {
     Column() {
-      // ===== 顶部栏（已嵌入底部 Tabs，无返回键） =====
-      Row() {
-        Text('发现')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.theme.palette.primaryText)
-        Blank()
-        ThemeToggle({ theme: this.theme })
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: 12, bottom: 8 })
-
       Scroll() {
         Column() {
+          // ===== 个人头版（hero 渐变全宽，圆角下摆；点击档案块进资料页） =====
+          this.heroHeader()
+          Column() {
           // ===== 训练历史日历 =====
           SectionCard({ theme: this.theme, title: '训练历史' }) {
             Row() {
@@ -1050,14 +1091,139 @@ export struct HistoryCalendar {
               }
             }
           }
+          }
+          .padding({ left: 16, right: 16, top: 16, bottom: 24 })
         }
-        .padding({ left: 16, right: 16, bottom: 24 })
       }
       .layoutWeight(1)
       .scrollBar(BarState.Off)
     }
     .width('100%')
     .height('100%')
+  }
+
+  /** 个人头版：hero 渐变 + 头像/档案 + 三项累计统计（点击档案块跳转资料页换头像） */
+  @Builder
+  heroHeader() {
+    Column() {
+      // 标题行（主题切换保留在右上角）
+      Row() {
+        Text('发现')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(this.theme.palette.onHero)
+        Blank()
+        ThemeToggle({ theme: this.theme })
+      }
+      .width('100%')
+
+      // 头像 + 目标·等级 + 加入日期
+      Row({ space: 14 }) {
+        Stack() {
+          if (this.avatarPath.length > 0) {
+            Image(`file://${this.avatarPath}`)
+              .width(64)
+              .height(64)
+              .borderRadius(32)
+              .clip(true)
+              .objectFit(ImageFit.Cover)
+              .accessibilityLevel('no')
+          } else {
+            Circle({ width: 64, height: 64 })
+              .fill(this.theme.palette.onHero)
+              .opacity(0.25)
+              .accessibilityLevel('no')
+            Text('👤')
+              .fontSize(26)
+              .accessibilityLevel('no')
+          }
+        }
+        .borderRadius(32)
+        .border({ width: 2, color: this.theme.palette.onHero })
+        .accessibilityLevel('no')
+        Column({ space: 4 }) {
+          Text(this.goalLevelText)
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.theme.palette.onHero)
+          Text(this.joinLineText)
+            .fontSize(12)
+            .fontColor(this.theme.palette.onHero)
+            .opacity(0.75)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        Text('›')
+          .fontSize(20)
+          .fontColor(this.theme.palette.onHero)
+          .opacity(0.7)
+          .accessibilityLevel('no')
+      }
+      .width('100%')
+      .margin({ top: 18 })
+      .accessibilityText('我的档案，点击进入资料页')
+      .onClick(() => {
+        router.pushUrl({ url: 'pages/ProfilePage' });
+      })
+
+      // 三项累计统计（细分隔线，参考快练发现页头版）
+      Row() {
+        Column({ space: 4 }) {
+          Text(`${this.totalMin}`)
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.theme.palette.onHero)
+          Text('总时长(分钟)')
+            .fontSize(12)
+            .fontColor(this.theme.palette.onHero)
+            .opacity(0.75)
+        }
+        .layoutWeight(1)
+        Row()
+          .width(1)
+          .height(30)
+          .backgroundColor(this.theme.palette.onHero)
+          .opacity(0.3)
+          .accessibilityLevel('no')
+        Column({ space: 4 }) {
+          Text(`${this.totalDays}`)
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.theme.palette.onHero)
+          Text('累计练习(天)')
+            .fontSize(12)
+            .fontColor(this.theme.palette.onHero)
+            .opacity(0.75)
+        }
+        .layoutWeight(1)
+        Row()
+          .width(1)
+          .height(30)
+          .backgroundColor(this.theme.palette.onHero)
+          .opacity(0.3)
+          .accessibilityLevel('no')
+        Column({ space: 4 }) {
+          Text(this.totalTons)
+            .fontSize(22)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.theme.palette.onHero)
+          Text('累计重量(t)')
+            .fontSize(12)
+            .fontColor(this.theme.palette.onHero)
+            .opacity(0.75)
+        }
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .margin({ top: 20 })
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 12, bottom: 22 })
+    .linearGradient({
+      angle: 135,
+      colors: [[this.theme.palette.heroStart, 0.0], [this.theme.palette.heroEnd, 1.0]]
+    })
+    .borderRadius({ bottomLeft: 24, bottomRight: 24 })
   }
 
   /** 热力图图例小色块 */
