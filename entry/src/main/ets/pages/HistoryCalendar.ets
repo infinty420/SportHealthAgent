@@ -73,6 +73,8 @@ export struct HistoryCalendar {
   @State private totalMin: number = 0;
   @State private totalDays: number = 0;
   @State private totalTons: string = '0.0';
+  /** 连续训练天数（头像角标；今天没练则从昨天起算，不断签） */
+  @State private streakDays: number = 0;
 
   // ===== 原始数据 =====
   @State private allLogs: WorkoutLog[] = [];
@@ -208,6 +210,17 @@ export struct HistoryCalendar {
     this.totalDays = daySet.size;
     this.totalTons = (volumeKg / 1000).toFixed(1);
     this.joinLineText = earliest > 0 ? `加入衡练 ${HistoryCalendar.dateKeyOf(earliest)}` : '开始你的第一次训练';
+    // 连续训练天数：今天无记录则从昨天起算（今天还没练不算断签）
+    let streak: number = 0;
+    let cursor: number = Date.now();
+    if (!this.dateCounts.has(HistoryCalendar.dateKeyOf(cursor))) {
+      cursor -= 86400000;
+    }
+    while (this.dateCounts.has(HistoryCalendar.dateKeyOf(cursor))) {
+      streak++;
+      cursor -= 86400000;
+    }
+    this.streakDays = streak;
   }
 
   // ==================== 日历 ====================
@@ -1137,6 +1150,18 @@ export struct HistoryCalendar {
               .fontSize(26)
               .accessibilityLevel('no')
           }
+          // 连续训练角标（参考快练皇冠位；>0 才显示）
+          if (this.streakDays > 0) {
+            Text(`🔥${this.streakDays}`)
+              .fontSize(10)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.theme.palette.onHero)
+              .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+              .backgroundColor(this.theme.palette.warning)
+              .borderRadius(10)
+              .translate({ x: 24, y: -24 })
+              .accessibilityLevel('no')
+          }
         }
         .borderRadius(32)
         .border({ width: 2, color: this.theme.palette.onHero })
@@ -1161,7 +1186,7 @@ export struct HistoryCalendar {
       }
       .width('100%')
       .margin({ top: 18 })
-      .accessibilityText('我的档案，点击进入资料页')
+      .accessibilityText(`我的档案，连续训练 ${this.streakDays} 天，点击进入资料页`)
       .onClick(() => {
         router.pushUrl({ url: 'pages/ProfilePage' });
       })
