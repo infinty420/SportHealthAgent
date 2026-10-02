@@ -75,6 +75,8 @@ struct ReportPage {
   @State whatIfSessionsText: string = '4';
   @State whatIfCalorieText: string = '-300';
   @State whatIfResult: WhatIfResult | null = null;
+  /** What-if 最近一次运行时刻（点击反馈，HH:MM:SS） */
+  @State whatIfRunAt: string = '';
   private calendarData: Map<string, number> = new Map<string, number>();
   // 训练日历 × 个人纪录合并卡：月日历状态
   @State private calYear: number = 2026;
@@ -360,6 +362,9 @@ struct ReportPage {
     const calorieDelta: number = Number(this.whatIfCalorieText);
     this.whatIfResult = WhatIfSimulator.simulate(this.currentWeightKg, sessions,
       this.avgSessionLoad, Number.isNaN(calorieDelta) ? 0 : calorieDelta);
+    const now: Date = new Date();
+    this.whatIfRunAt = `${now.getHours()}`.padStart(2, '0') + ':' +
+      `${now.getMinutes()}`.padStart(2, '0') + ':' + `${now.getSeconds()}`.padStart(2, '0');
   }
 
   /** 日期键（YYYY-MM-DD，本地时区） */
@@ -1078,6 +1083,11 @@ struct ReportPage {
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(16)
+            .margin({ top: 4 })
+          Text(`已按当前假设更新 · ${this.whatIfRunAt}`)
+            .fontSize(11)
+            .fontColor(this.theme.palette.secondaryText)
+            .lineHeight(15)
             .margin({ top: 4 })
         }
       }
