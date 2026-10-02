@@ -1,8 +1,8 @@
 {
   // AI 生成 —— 应用级配置脚手架
   "app": {
-    "bundleName": "com.example.sporthealthagent",
-    "vendor": "example",
+    "bundleName": "com.infinty.henglian",
+    "vendor": "infinty",
     "versionCode": 1000000,
     "versionName": "1.0.0",
     "icon": "$media:app_icon",
