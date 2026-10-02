@@ -71,7 +71,8 @@ export struct HistoryCalendar {
   @State private joinLineText: string = '';
   @State private totalMin: number = 0;
   @State private totalDays: number = 0;
-  @State private totalTons: string = '0.0';
+  /** 累计重量（kg，全部日志容量求和取整） */
+  @State private totalVolumeKg: number = 0;
   /** 连续训练天数（头像角标；今天没练则从昨天起算，不断签） */
   @State private streakDays: number = 0;
 
@@ -193,7 +194,7 @@ export struct HistoryCalendar {
     });
     this.totalMin = minutes;
     this.totalDays = daySet.size;
-    this.totalTons = (volumeKg / 1000).toFixed(1);
+    this.totalVolumeKg = Math.round(volumeKg);
     this.joinLineText = earliest > 0 ? `加入衡练 ${HistoryCalendar.dateKeyOf(earliest)}` : '开始你的第一次训练';
     // 连续训练天数：今天无记录则从昨天起算（今天还没练不算断签）
     let streak: number = 0;
@@ -1142,11 +1143,11 @@ export struct HistoryCalendar {
           .opacity(0.3)
           .accessibilityLevel('no')
         Column({ space: 4 }) {
-          Text(this.totalTons)
+          Text(`${this.totalVolumeKg}`)
             .fontSize(22)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.theme.palette.onHero)
-          Text('累计重量(t)')
+          Text('累计重量(kg)')
             .fontSize(12)
             .fontColor(this.theme.palette.onHero)
             .opacity(0.75)
