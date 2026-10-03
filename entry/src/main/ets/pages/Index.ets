@@ -232,6 +232,8 @@ struct Index {
     this.wellnessStore = new WellnessLogStore(context);
     this.waterLog = new WaterLog(context);
     this.ruleTableStore = new RuleTableStore(context);
+    // 恢复用户设定的周目标（修复：重启后目标恢复默认的审核问题）
+    this.goal = this.goalStore.load();
     const ruleTable: RuleTable = this.ruleTableStore.load();
     RuleTableStore.applyStatics(ruleTable);
     this.weightStepKg = ruleTable.weightStepKg;
@@ -1617,7 +1619,7 @@ struct Index {
                   .margin({ top: 6 })
               }
             } else {
-              Text('中周期计划生成中…')
+              Text('中周期计划计算中…')
                 .fontSize(13)
                 .fontColor(this.theme.palette.secondaryText)
             }
@@ -1923,7 +1925,7 @@ struct Index {
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor(this.theme.palette.primaryText)
-          Text('录入运动数据，端侧 Agent 即时分析')
+          Text('录入运动数据，端侧规则引擎即时分析')
             .fontSize(12)
             .fontColor(this.theme.palette.secondaryText)
         }
@@ -2056,7 +2058,7 @@ struct Index {
                 .backgroundColor(this.theme.palette.inputBackground)
                 .borderRadius(20)
                 .layoutWeight(1)
-                .accessibilityText('生成一条模拟运动记录并分析')
+                .accessibilityText('模拟录入一条运动记录并分析')
                 .onClick(() => {
                   this.runMockAnalysis();
                 })
@@ -2106,7 +2108,7 @@ struct Index {
                   }
                   .alignItems(HorizontalAlign.Start)
                   .layoutWeight(1)
-                  Button(this.mesoTemplate === template.name ? '使用中' : '一键生成')
+                  Button(this.mesoTemplate === template.name ? '使用中' : '一键套用')
                     .fontSize(12)
                     .fontColor(this.mesoTemplate === template.name ?
                       this.theme.palette.secondaryText : this.theme.palette.onAccent)
@@ -2122,7 +2124,7 @@ struct Index {
                 .width('100%')
                 .padding({ top: 8, bottom: 8 })
               }, (template: PlanTemplate) => template.id)
-              Text('生成后中周期从第 1 周重排')
+              Text('套用后中周期从第 1 周重排')
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
                 .lineHeight(16)
@@ -2173,7 +2175,7 @@ struct Index {
                   .fontSize(15)
                   .fontWeight(FontWeight.Medium)
                   .fontColor(this.theme.palette.primaryText)
-                Text('完成一次分析后自动生成本周计划')
+                Text('完成一次分析后自动排出本周计划')
                   .fontSize(13)
                   .fontColor(this.theme.palette.secondaryText)
                   .lineHeight(18)

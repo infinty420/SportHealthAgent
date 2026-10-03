@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "端侧运动健康 Agent：纯规则引擎，不联网"
+      "value": "端侧运动健康助手：纯规则引擎，不联网"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "衡练 · 运动健康 Agent 主入口"
+      "value": "衡练 · 运动健康主入口"
     },
     {
       "name": "EntryAbility_label",
@@ -86,7 +86,7 @@
     },
     {
       "name": "app_title",
-      "value": "衡练 · 运动健康 Agent"
+      "value": "衡练 · 运动健康"
     },
     {
       "name": "app_subtitle",

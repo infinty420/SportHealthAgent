@@ -1,7 +1,21 @@
 {
   // AI 生成 —— 工程级构建配置
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "C:/Users/infinty/ANTIMATTER.p12",
+          "storePassword": "0000001950D8103AF506ECE5ED34FD9A91F53B3E61123A75620B350F5EBBE4159D9B2C543FB2D427CC",
+          "keyAlias": "infinty",
+          "keyPassword": "00000019E3686FB1AA2F3A6CE2F36EE0E7DEEB3BBDCCBA368441C1129FDB9EB4E20DD53D3AC44728C8",
+          "signAlg": "SHA256withECDSA",
+          "profile": "D:/henglianRelease.p7b",
+          "certpath": "D:/hl.cer"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",

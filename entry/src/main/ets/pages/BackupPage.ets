@@ -187,7 +187,7 @@ struct BackupPage {
                 .fontSize(14)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(this.theme.palette.primaryText)
-              Text('生成单文件到应用沙箱')
+              Text('导出单文件到应用沙箱')
                 .fontSize(11)
                 .fontColor(this.theme.palette.secondaryText)
             }

@@ -2,11 +2,11 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "On-device sports & health agent: pure rule engine, fully offline"
+      "value": "On-device sports & health companion: pure rule engine, fully offline"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "HengLian · Sports & Health Agent main entry"
+      "value": "HengLian · Sports & Health main entry"
     },
     {
       "name": "EntryAbility_label",
@@ -86,7 +86,7 @@
     },
     {
       "name": "app_title",
-      "value": "HengLian · Sports & Health Agent"
+      "value": "HengLian · Sports & Health"
     },
     {
       "name": "app_subtitle",

@@ -597,11 +597,11 @@ struct ReportPage {
         .catch((err: Error) => {
           fs.closeSync(file);
           console.error(`shareCard pack failed: ${err.message}`);
-          promptAction.showToast({ message: '分享卡生成失败，请重试' });
+          promptAction.showToast({ message: '分享卡保存失败，请重试' });
         });
     } catch (err) {
       console.error(`shareCard failed: ${JSON.stringify(err)}`);
-      promptAction.showToast({ message: '分享卡生成失败，请重试' });
+      promptAction.showToast({ message: '分享卡保存失败，请重试' });
     }
   }
 
@@ -637,7 +637,7 @@ struct ReportPage {
           .borderRadius(16)
           .height(32)
           .margin({ right: 8 })
-          .accessibilityText('生成训练周报分享卡片图片')
+          .accessibilityText('导出训练周报分享卡片图片')
           .onClick(() => {
             this.exportShareCard();
           })
@@ -847,7 +847,7 @@ struct ReportPage {
           .fontColor(this.theme.palette.secondaryText)
           .margin({ top: 2, bottom: 4 })
         if (this.prList.length === 0) {
-          Text('暂无纪录，录入组数后自动生成')
+          Text('暂无纪录，录入组数后自动更新')
             .fontSize(13)
             .fontColor(this.theme.palette.secondaryText)
             .lineHeight(18)
