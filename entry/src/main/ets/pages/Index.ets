@@ -118,6 +118,8 @@ struct Index {
   @State soreness: number = 2;
   @State waterText: string = '1500';
   @State readiness: ReadinessReport | null = null;
+  /** 本周汇总统计（响应式源：StatCard 行与目标卡直读，训练保存后即时刷新，修复审核反馈「分析后未刷新」） */
+  @State weeklyStats: PeriodStats = { sessions: 0, totalDurationMin: 0, totalCalories: 0, avgLoad: 0 };
   /** 准备度参与因子（首页卡展示）：疲劳指数 / 距上次训练小时数 */
   @State readinessFatigue: number = 0;
   @State readinessHours: number = -1;
@@ -263,6 +265,7 @@ struct Index {
       return;
     }
     this.refreshHistory();
+    this.refreshWeeklyStats();
     this.loadWellness();
     this.refreshMesocycle();
     this.refreshWater();
@@ -279,6 +282,7 @@ struct Index {
     this.applyInjuries();
     this.refreshIntake();
     this.refreshMuscleHeat();
+    this.refreshWeeklyStats();
     this.refreshMesocycle();
     this.refreshWater();
     this.refreshMealTiming();
@@ -940,31 +944,27 @@ struct Index {
     return `距离完全恢复约 ${remaining} 小时`;
   }
 
+  /** 刷新本周统计到响应式状态（保存训练/返回首页/切回首页 Tab 时调用） */
+  private refreshWeeklyStats(): void {
+    if (this.historyStore === null) {
+      return;
+    }
+    this.weeklyStats = this.historyStore.getWeeklyStats();
+  }
+
   /** 本周已完成训练次数 */
   private weeklySessionsDone(): number {
-    if (this.historyStore === null) {
-      return 0;
-    }
-    const stats: PeriodStats = this.historyStore.getWeeklyStats();
-    return stats.sessions;
+    return this.weeklyStats.sessions;
   }
 
   /** 本周已完成训练总时长（分钟） */
   private weeklyDurationDone(): number {
-    if (this.historyStore === null) {
-      return 0;
-    }
-    const stats: PeriodStats = this.historyStore.getWeeklyStats();
-    return stats.totalDurationMin;
+    return this.weeklyStats.totalDurationMin;
   }
 
   /** 本周已消耗总热量（千卡） */
   private weeklyCaloriesDone(): number {
-    if (this.historyStore === null) {
-      return 0;
-    }
-    const stats: PeriodStats = this.historyStore.getWeeklyStats();
-    return stats.totalCalories;
+    return this.weeklyStats.totalCalories;
   }
 
   /** 本周目标达成率（次数与时长取较低者，更保守） */
@@ -1099,12 +1099,13 @@ struct Index {
     .animationDuration(200)
     .onChange((index: number) => {
       this.currentTab = index;
-      // 切回首页时重载画像/伤病/营养/肌群热力（替代原 onPageShow 的跨页刷新）
+      // 切回首页时重载画像/伤病/营养/肌群热力/本周统计（替代原 onPageShow 的跨页刷新）
       if (index === 0) {
         this.reloadProfile();
         this.applyInjuries();
         this.refreshIntake();
         this.refreshMuscleHeat();
+        this.refreshWeeklyStats();
       }
       // 切到发现页时通知日历重载训练日志
       if (index === 4) {
