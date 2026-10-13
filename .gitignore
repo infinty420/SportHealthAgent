@@ -18,3 +18,5 @@ entry/.preview/
 
 # 本地环境
 local.properties
+_backup_layer5/
+hs_err_pid*.log
